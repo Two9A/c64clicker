@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+ <head>
+  <title>Commodore Clicker</title>
+  <link rel="stylesheet" type="text/css" href="css/index.css">
+  <link rel="stylesheet" type="text/css" href="css/jquery.powertip-yellow.css">
+  <script data-main="js/main" src="js/thirdparty/require.js"></script>
+ </head>
+ <body>
+  <div class="head">
+   <h1><a href="http://c64clicker.com">Commodore Clicker</a></h1>
+   <div id="about">
+    <p><strong>Render the screen of a Commodore 64</strong> pixel by pixel, and unleash the graphical prowess of the greatest computer of the 80s!</p>
+    <p>Purchase oscillators to kick-start the computer's clock, using the pixels you've built up; buy upgrades to power up your clicking, and to start special graphical effects.</p>
+    <em>This is not a full simulation of a C64. Not yet, anyways.</em>
+   </div>
+  </div>
+  <div id="bank"></div>
+  <div id="cps"></div>
+  <div id="click">Render <span id="pixels_per_click"></span></div>
+  <div class="content">
+   <div class="sidebar">
+    <div class="items">
+     <ul class="tabs">
+      <li rel="units">Oscillators</li>
+      <li rel="upgrades">Upgrades</li>
+      <!--<li rel="achievements">Achievements</li>-->
+     </ul>
+     <div class="itemlists">
+      <ul class="units">
+      </ul>
+      <ul class="upgrades">
+      </ul>
+      <ul class="achievements">
+      </ul>
+     </div>
+    </div>
+   </div>
+   <div class="screen">
+    <canvas id="screen" width="504" height="312"></canvas>
+    <ul class="status">
+     <li>Frame: <span id="curframe"></span></li>
+     <li>Raster: <span id="curraster"></span></li>
+     <li>Clock speed: <span id="clock"></span></li>
+     <li>Rendering: <span id="curperiod"></span></li>
+    </ul>
+    <div id="reset">Hard Reset</div>
+   </div>
+  </div>
+  <div class="foot">
+   Developed by <a href="http://imrannazar.com/">Imran Nazar</a>, 2014. v0.1 alpha.
+  </div>
+ </body>
+</html>
