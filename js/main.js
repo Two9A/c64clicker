@@ -467,6 +467,15 @@ require([
                 }
                 return false;
             }.bind(this));
+            $('#lightmode').on('click', function(e) {
+                if ($('#lightmode').is(':checked')) {
+                    this.FPS = 1;
+                } else {
+                    this.FPS = 40;
+                }
+                clearInterval(this.intervals.step);
+                this.intervals.step = setInterval(this.stepDraw.bind(this), 1000 / this.FPS);
+            }.bind(this));
 
             this.intervals = {
                 step: setInterval(this.stepDraw.bind(this), 1000 / this.FPS),
@@ -480,6 +489,7 @@ require([
                 return;
             }
 
+            this.FPS = parseInt(window.localStorage['c64click.FPS']);
             var i, vars = ['bank', 'cps', 'clickPower', 'produced', 'spent', 'frames', 'thisFrame'];
             for (i in vars) {
                 this[vars[i]] = BigInteger(window.localStorage['c64click.' + vars[i]]);
@@ -505,9 +515,13 @@ require([
             for (i in this.upgrades) {
                 this.upgrades[i].purchased = !!(0|window.localStorage['c64click.upgrades.' + i + '.purchased']);
             }
+            if (this.FPS == 1) {
+                $('#lightmode').attr('checked', true)
+            }
         },
         save: function() {
             var i, state = {
+                'FPS':          this.FPS.toString(),
                 'bank':         this.bank.toString(),
                 'cps':          this.cps.toString(),
                 'clickPower':   this.clickPower.toString(),
