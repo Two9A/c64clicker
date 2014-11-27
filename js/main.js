@@ -203,7 +203,6 @@ require([
             this.produced = this.produced.add(amt);
             this.thisFrame = this.thisFrame.add(amt);
             while (this.thisFrame.compare(VIC.sizes.FRAME_SIZE) >= 0) {
-                VIC.renderFrame(VIC.sizes.FRAME_SIZE);
                 this.thisFrame = this.thisFrame.subtract(VIC.sizes.FRAME_SIZE);
                 this.frames = this.frames.next();
                 VIC.saveFrame(
@@ -436,7 +435,6 @@ require([
                 return fBound;
               };
             }
-            VIC.init.call(VIC);
 
             this.frontCanvas = document.getElementById('screen');
             this.frontCanvas.width = VIC.sizes.RASTER_LENGTH;
