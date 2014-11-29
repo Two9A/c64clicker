@@ -1,9 +1,11 @@
 define([
     'c64/vic',
-    'c64/mmu'
-], function(VIC, MMU) {
+    'c64/mmu',
+    'c64/cpu'
+], function(VIC, MMU, CPU) {
     var C64 = {
         MMU: MMU,
+        CPU: CPU,
         VIC: VIC
     };
     for (var i in C64) {

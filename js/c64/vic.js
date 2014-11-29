@@ -201,7 +201,8 @@ define(function() {
             }
         },
         renderFrame: function(pixels) {
-            var i = 0, j, k, p, x = 0, y = 0, pos = 0, scanmode = 0, row = 0, loc = 0;
+            var i = 0, j, k, p;
+            var x = 0, y = 0, step = 0, pos = 0, mode = 0, row = 0, loc = 0;
             var sx, cx, cy, px, py,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
@@ -379,7 +380,7 @@ define(function() {
                         break;
                 }
                 
-                x++; i++;
+                x++; i++; step++;
                 if (x == this.sizes.RASTER_LENGTH) {
                     x = 0;
                     y++;
@@ -389,6 +390,11 @@ define(function() {
                     this.registers[this.rg.FLAGS0] = (y & 256) ?
                         (this.registers[this.rg.FLAGS0] | 128) :
                         (this.registers[this.rg.FLAGS0] & 127);
+                }
+
+                if (step == 8) {
+                    step = 0;
+                    this.owner.CPU.step();
                 }
             } while (i < pixels);
 
@@ -403,12 +409,29 @@ define(function() {
             if (numFrames > 2) {
                 numFrames = 2;
             }
-            this.renderedFrames[frame] = this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
+            
+            this.renderedFrames[frame] = {
+                VIC: {
+                    image: this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT),
+                    colorRam: new Uint8Array(this.colorRam)
+                },
+                CPU: {
+                    curOp: this.owner.CPU.curOp,
+                    curCycle: this.owner.CPU.curCycle,
+                    reg: $.extend({}, this.owner.CPU.reg)
+                },
+                MMU: {
+                    ram: new Uint8Array(this.owner.MMU.ram),
+                    busLock: this.owner.MMU.busLock
+                }
+            };
+
             for (i in this.renderedFrames) {
                 if (i > 0 && i < (frame - numFrames)) {
                     delete this.renderedFrames[i];
                 }
             }
+
             this.rasterbarsValues = [];
             for (i = 0; i < this.sizes.RASTER_COUNT; i+=8) {
                 this.rasterbarsValues.push(Math.floor(Math.random()*16));
@@ -422,7 +445,15 @@ define(function() {
             if (!this.renderedFrames[frame]) {
                 frame = 0;
             }
-            this.backContext.putImageData(this.renderedFrames[frame], 0, 0);
+            this.backContext.putImageData(this.renderedFrames[frame].VIC.image, 0, 0);
+            this.colorRam = this.renderedFrames[frame].VIC.colorRam;
+
+            this.owner.CPU.curOp = this.renderedFrames[frame].CPU.curOp;
+            this.owner.CPU.curCycle = this.renderedFrames[frame].CPU.curCycle;
+            this.owner.CPU.reg = this.renderedFrames[frame].CPU.reg;
+
+            this.owner.MMU.ram = this.renderedFrames[frame].MMU.ram;
+            this.owner.MMU.busLock = this.renderedFrames[frame].MMU.busLock;
         },
         fillRasterModes: function() {
             var i, j;

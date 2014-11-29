@@ -15,6 +15,7 @@ require([
     VIC = C64.VIC;
     window.CClicker = {
         FPS: 40,
+        debug: false,
 
         bank: null,
         produced: null,
@@ -368,7 +369,6 @@ require([
         },
         renderItems: function() {
             var i;
-            this.C64 = C64;
             $('.itemlists ul').empty();
             for (i in this.units) {
                 $('ul.units').append([
@@ -436,6 +436,9 @@ require([
               };
             }
 
+            this.C64 = C64;
+            this.C64.game = this;
+
             this.frontCanvas = document.getElementById('screen');
             this.frontCanvas.width = VIC.sizes.RASTER_LENGTH;
             this.frontCanvas.height = VIC.sizes.RASTER_COUNT;
@@ -489,7 +492,8 @@ require([
                 return;
             }
 
-            this.FPS = parseInt(window.localStorage['c64click.FPS']);
+            this.FPS = parseInt(window.localStorage['c64click.FPS']) || 40;
+            this.debug = !!(0|window.localStorage['c64click.debug']);
             var i, vars = ['bank', 'cps', 'clickPower', 'produced', 'spent', 'frames', 'thisFrame'];
             for (i in vars) {
                 this[vars[i]] = BigInteger(window.localStorage['c64click.' + vars[i]]);
@@ -521,7 +525,8 @@ require([
         },
         save: function() {
             var i, state = {
-                'FPS':          this.FPS.toString(),
+                'FPS':          this.FPS,
+                'debug':        this.debug ? 1 : 0,
                 'bank':         this.bank.toString(),
                 'cps':          this.cps.toString(),
                 'clickPower':   this.clickPower.toString(),
@@ -553,6 +558,9 @@ require([
         wipe: function() {
             window.localStorage.clear();
             this.reset();
+        },
+        setDebug: function(flag) {
+            this.debug = !!flag;
         },
         pluralize: function(num, str, doPlural) {
             if (doPlural === undefined) {
