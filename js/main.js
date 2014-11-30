@@ -479,6 +479,12 @@ require([
                 } else {
                     this.FPS = 40;
                 }
+                this.cps_step = 0;
+                if (this.cps.compare(1048576) < 0) {
+                    this.cps_div = this.cps.toJSValue() / this.FPS;
+                } else {
+                    this.cps_div = this.cps.divide(this.FPS).toJSValue();
+                }
                 clearInterval(this.intervals.step);
                 this.intervals.step = setInterval(this.stepDraw.bind(this), 1000 / this.FPS);
             }.bind(this));
