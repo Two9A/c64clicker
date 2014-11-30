@@ -417,7 +417,7 @@ define(function() {
                 },
                 CPU: {
                     clock: this.owner.CPU.clock,
-                    curOp: this.owner.CPU.curOp,
+                    curOp: this.owner.CPU.curOp.slice(0),
                     curCycle: this.owner.CPU.curCycle,
                     reg: $.extend({}, this.owner.CPU.reg)
                 },
@@ -447,14 +447,14 @@ define(function() {
                 frame = 0;
             }
             this.backContext.putImageData(this.renderedFrames[frame].VIC.image, 0, 0);
-            this.colorRam = this.renderedFrames[frame].VIC.colorRam;
+            this.colorRam = new Uint8Array(this.renderedFrames[frame].VIC.colorRam);
 
             this.owner.CPU.clock = this.renderedFrames[frame].CPU.clock;
-            this.owner.CPU.curOp = this.renderedFrames[frame].CPU.curOp;
+            this.owner.CPU.curOp = this.renderedFrames[frame].CPU.curOp.slice(0);
             this.owner.CPU.curCycle = this.renderedFrames[frame].CPU.curCycle;
-            this.owner.CPU.reg = this.renderedFrames[frame].CPU.reg;
+            this.owner.CPU.reg = $.extend({}, this.renderedFrames[frame].CPU.reg);
 
-            this.owner.MMU.ram = this.renderedFrames[frame].MMU.ram;
+            this.owner.MMU.ram = new Uint8Array(this.renderedFrames[frame].MMU.ram);
             this.owner.MMU.busLock = this.renderedFrames[frame].MMU.busLock;
         },
         fillRasterModes: function() {

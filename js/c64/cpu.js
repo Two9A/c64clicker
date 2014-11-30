@@ -1,11 +1,20 @@
 define(function() {
     return {
         clock: null,
+        printedTo: null,
+
         curOp: [],
         curCycle: null,
         reg: null,
         halted: null,
         util: {
+            setFlag: function(flag, cond) {
+                if (cond) {
+                    this.reg.P |= flag;
+                } else {
+                    this.reg.P &= (255 - flag);
+                }
+            },
             setNZ: function(val) {
                 if (val & 128) {
                     this.reg.P |= this.flags.N;
@@ -18,10 +27,50 @@ define(function() {
                 } else {
                     this.reg.P &= (255 - this.flags.Z);
                 }
+            },
+            branch: function(flag, val) {
+                if ((this.reg.P & flag) == val) {
+                    this.reg.PC = this.reg.addr;
+                    if (!this.reg.tmp4) {
+                        this.reg.tmp4 = 1;
+                        return false;
+                    } else if ((this.reg.addr & 0xFF00) != (this.reg.tmp1 & 0xFF00)) {
+                        if (this.reg.tmp4 == 1) {
+                            this.reg.tmp4 = 2;
+                            return false;
+                        }
+                    }
+                }
+                return true;
             }
         },
         ops: {
             ADC: function() {
+                var res = this.reg.operand + this.reg.A + ((this.reg.P & this.flags.C) ? 1 : 0);
+                if (this.reg.P & this.flags.D) {
+                    this.util.setFlag.call(this, this.flags.Z, res == 0);
+                    if ((this.reg.operand & 15) + (this.reg.A & 15) + ((this.reg.P & this.flags.C) ? 1 : 0) > 9) {
+                        res += 6;
+                    }
+                    this.util.setFlag.call(this, this.flags.N, res & 128);
+                    this.util.setFlag.call(this, this.flags.V, !(
+                        ((this.reg.A ^ this.reg.operand) & 128) &&
+                        ((this.reg.A ^ res) && 128)
+                    ));
+                    if (res > 0x99) {
+                        res += 0x60;
+                    }
+                    this.util.setFlag.call(this, this.flags.C, res > 0x99);
+                } else {
+                    this.util.setNZ.call(this, res);
+                    this.util.setFlag.call(this, this.flags.V, !(
+                        ((this.reg.A ^ this.reg.operand) & 128) &&
+                        ((this.reg.A ^ res) && 128)
+                    ));
+                    this.util.setFlag.call(this, this.flags.C, res > 255);
+                }
+
+                this.reg.A = res & 255;
                 return true;
             },
             AHX: function() {
@@ -39,7 +88,7 @@ define(function() {
             },
             AND: function() {
                 this.reg.A = (this.reg.A & this.reg.operand) & 255;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             ARR: function() {
@@ -48,6 +97,9 @@ define(function() {
             },
             ASL: function() {
                 this.reg.writeflag = true;
+                this.util.setFlag.call(this, this.flags.C, this.reg.operand & 128);
+                this.reg.operand = (this.reg.operand << 1) & 255;
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             AXS: function() {
@@ -55,34 +107,37 @@ define(function() {
                 return true;
             },
             BCC: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.C, 0);
             },
             BCS: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.C, this.flags.C);
             },
             BEQ: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.Z, this.flags.Z);
             },
             BIT: function() {
+                this.util.setFlag.call(this, this.flags.N, this.reg.operand & 128);
+                this.util.setFlag.call(this, this.flags.V, this.reg.operand & 64);
+                this.util.setFlag.call(this, this.flags.Z, this.reg.operand & this.reg.A);
                 return true;
             },
             BMI: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.N, this.flags.N);
             },
             BNE: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.Z, 0);
             },
             BPL: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.N, 0);
             },
             BRK: function() {
                 return true;
             },
             BVC: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.V, 0);
             },
             BVS: function() {
-                return true;
+                return this.util.branch.call(this, this.flags.V, this.flags.V);
             },
             CLC: function() {
                 this.reg.P &= (255 - this.flags.C);
@@ -101,12 +156,21 @@ define(function() {
                 return true;
             },
             CMP: function() {
+                var res = (this.reg.A - this.reg.operand) & 511;
+                this.util.setFlag.call(this, this.flags.C, res < 256);
+                this.util.setNZ.call(this, res & 255);
                 return true;
             },
             CPX: function() {
+                var res = (this.reg.X - this.reg.operand) & 511;
+                this.util.setFlag.call(this, this.flags.C, res < 256);
+                this.util.setNZ.call(this, res & 255);
                 return true;
             },
             CPY: function() {
+                var res = (this.reg.Y - this.reg.operand) & 511;
+                this.util.setFlag.call(this, this.flags.C, res < 256);
+                this.util.setNZ.call(this, res & 255);
                 return true;
             },
             DCP: function() {
@@ -117,22 +181,22 @@ define(function() {
             DEC: function() {
                 this.reg.writeflag = true;
                 this.reg.operand = (this.reg.operand - 1) & 255;
-                this.util.setNZ(this.reg.operand);
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             DEX: function() {
                 this.reg.X = (this.reg.X - 1) & 255;
-                this.util.setNZ(this.reg.X);
+                this.util.setNZ.call(this, this.reg.X);
                 return true;
             },
             DEY: function() {
                 this.reg.Y = (this.reg.Y - 1) & 255;
-                this.util.setNZ(this.reg.Y);
+                this.util.setNZ.call(this, this.reg.Y);
                 return true;
             },
             EOR: function() {
                 this.reg.A = (this.reg.A ^ this.reg.operand) & 255;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             HLT: function() {
@@ -142,17 +206,17 @@ define(function() {
             INC: function() {
                 this.reg.writeflag = true;
                 this.reg.operand = (this.reg.operand + 1) & 255;
-                this.util.setNZ(this.reg.operand);
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             INX: function() {
                 this.reg.X = (this.reg.X + 1) & 255;
-                this.util.setNZ(this.reg.X);
+                this.util.setNZ.call(this, this.reg.X);
                 return true;
             },
             INY: function() {
                 this.reg.Y = (this.reg.Y + 1) & 255;
-                this.util.setNZ(this.reg.Y);
+                this.util.setNZ.call(this, this.reg.Y);
                 return true;
             },
             ISC: function() {
@@ -161,6 +225,7 @@ define(function() {
                 return true;
             },
             JMP: function() {
+                this.reg.PC = this.reg.addr;
                 return true;
             },
             JSR: function() {
@@ -176,21 +241,24 @@ define(function() {
             },
             LDA: function() {
                 this.reg.A = this.reg.operand;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             LDX: function() {
                 this.reg.X = this.reg.operand;
-                this.util.setNZ(this.reg.X);
+                this.util.setNZ.call(this, this.reg.X);
                 return true;
             },
             LDY: function() {
                 this.reg.Y = this.reg.operand;
-                this.util.setNZ(this.reg.Y);
+                this.util.setNZ.call(this, this.reg.Y);
                 return true;
             },
             LSR: function() {
                 this.reg.writeflag = true;
+                this.util.setFlag.call(this, this.flags.C, this.reg.operand & 1);
+                this.reg.operand >>= 1;
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             NOP: function() {
@@ -199,7 +267,7 @@ define(function() {
             },
             ORA: function() {
                 this.reg.A = (this.reg.A | this.reg.operand) & 255;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             PHA: function() {
@@ -221,10 +289,23 @@ define(function() {
             },
             ROL: function() {
                 this.reg.writeflag = true;
+                this.reg.operand <<= 1;
+                if (this.reg.P & this.flags.C) {
+                    this.reg.operand |= 1;
+                }
+                this.util.setFlag.call(this, this.flags.C, this.reg.operand > 255);
+                this.reg.operand &= 255;
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             ROR: function() {
                 this.reg.writeflag = true;
+                if (this.reg.P & this.flags.C) {
+                    this.reg.operand |= 256;
+                }
+                this.util.setFlag.call(this, this.flags.C, this.reg.operand & 1);
+                this.reg.operand >>= 1;
+                this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
             RRA: function() {
@@ -243,6 +324,22 @@ define(function() {
                 return true;
             },
             SBC: function() {
+                var res = this.reg.A - this.reg.operand - ((this.reg.P & this.flags.C) ? 1 : 0);
+                this.util.setNZ.call(this, res & 255);
+                this.util.setFlag.call(this, this.flags.V,
+                    ((this.reg.A ^ this.reg.operand) & 128) &&
+                    ((this.reg.A ^ res) && 128)
+                );
+                if (this.reg.P & this.flags.D) {
+                    if ((this.reg.A & 15) - ((this.reg.P & this.flags.C) ? 1 : 0) < (this.reg.operand & 15)) {
+                        res -= 6;
+                    }
+                    if (res > 0x99) {
+                        res -= 0x60;
+                    }
+                }
+                this.util.setFlag.call(this, this.flags.C, res < 256);
+                this.reg.A = res & 255;
                 return true;
             },
             SEC: function() {
@@ -301,22 +398,22 @@ define(function() {
             },
             TAX: function() {
                 this.reg.X = this.reg.A;
-                this.util.setNZ(this.reg.X);
+                this.util.setNZ.call(this, this.reg.X);
                 return true;
             },
             TAY: function() {
                 this.reg.Y = this.reg.A;
-                this.util.setNZ(this.reg.Y);
+                this.util.setNZ.call(this, this.reg.Y);
                 return true;
             },
             TSX: function() {
                 this.reg.X = this.reg.S;
-                this.util.setNZ(this.reg.X);
+                this.util.setNZ.call(this, this.reg.X);
                 return true;
             },
             TXA: function() {
                 this.reg.A = this.reg.X;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             TXS: function() {
@@ -325,7 +422,7 @@ define(function() {
             },
             TYA: function() {
                 this.reg.A = this.reg.Y;
-                this.util.setNZ(this.reg.A);
+                this.util.setNZ.call(this, this.reg.A);
                 return true;
             },
             XAA: function() {
@@ -560,12 +657,15 @@ define(function() {
                 if (this.curOp.length == 1) {
                     this.curOp.push(this.owner.MMU.r(this.reg.PC));
                     this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
-                    this.reg.operand = this.curOp[1];
-                    this.reg.addr = (this.curOp[1] & 128)
-                        ? -(256 - this.curOp[1])
-                        : this.curOp[1];
-                    this.reg.addr += this.reg.PC;
+                    this.reg.tmp1 = this.reg.PC;
+                    return false;
                 }
+
+                this.reg.operand = this.curOp[1];
+                this.reg.addr = (this.curOp[1] & 128)
+                    ? -(256 - this.curOp[1])
+                    : this.curOp[1];
+                this.reg.addr += this.reg.tmp1;
                 return true;
             },
             rel_w: function() {
@@ -755,8 +855,12 @@ define(function() {
                     if (!this.reg.operated) {
                         this.reg.operated = this.ops[op[0]].call(this);
                     }
-                    if (this.reg.operated && this.reg.writeflag) {
-                        if (this.addr[op[1] + '_w'].call(this)) {
+                    if (this.reg.operated) {
+                        if (this.reg.writeflag) {
+                            if (this.addr[op[1] + '_w'].call(this)) {
+                                this.resetOp();
+                            }
+                        } else {
                             this.resetOp();
                         }
                     }
@@ -764,7 +868,18 @@ define(function() {
             }
 
             if (this.owner.game.debug) {
-                console.log(this.clock, this.curOp, this.curCycle, this.reg);
+                if (this.clock > this.printedTo) {
+                    console.log(
+                        this.clock,
+                        this.curOp,
+                        this.curOp.length
+                            ? (this.map[this.curOp[0]][0] + this.map[this.curOp[0]][1])
+                            : 'END',
+                        this.curCycle,
+                        $.extend({}, this.reg)
+                    );
+                    this.printedTo++;
+                }
             }
         },
         reset: function() {
@@ -788,6 +903,7 @@ define(function() {
                 tmp4: null
             };
             this.clock = 0;
+            this.printedTo = 0;
             this.halted = false;
             this.resetOp();
         },
