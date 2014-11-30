@@ -416,6 +416,7 @@ define(function() {
                     colorRam: new Uint8Array(this.colorRam)
                 },
                 CPU: {
+                    clock: this.owner.CPU.clock,
                     curOp: this.owner.CPU.curOp,
                     curCycle: this.owner.CPU.curCycle,
                     reg: $.extend({}, this.owner.CPU.reg)
@@ -448,6 +449,7 @@ define(function() {
             this.backContext.putImageData(this.renderedFrames[frame].VIC.image, 0, 0);
             this.colorRam = this.renderedFrames[frame].VIC.colorRam;
 
+            this.owner.CPU.clock = this.renderedFrames[frame].CPU.clock;
             this.owner.CPU.curOp = this.renderedFrames[frame].CPU.curOp;
             this.owner.CPU.curCycle = this.renderedFrames[frame].CPU.curCycle;
             this.owner.CPU.reg = this.renderedFrames[frame].CPU.reg;
@@ -522,6 +524,7 @@ define(function() {
             }
             this.owner.MMU.ram[this.SCREENPTR * 1024 + 240] = 224;
 
+            this.renderedFrames = {};
             this.backContext.fillStyle = 'black';
             this.backContext.fillRect(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
             this.saveFrame(0, 1);

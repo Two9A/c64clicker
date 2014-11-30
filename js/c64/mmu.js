@@ -1,4 +1,4 @@
-define(function() {
+define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
     return {
         busLock: null,
         vicBank: null,
@@ -72,20 +72,42 @@ define(function() {
                     this.owner.VIC.io_w(addr, val);
             }
         },
-        init: function() {
-            var i, j;
+        load: function(file, addr) {
+            $.ajax({
+                url: file,
+                dataType: 'arraybuffer',
+                beforeSend: function(xhr) {
+                    xhr.overrideMimeType("text/plain; charset=x-user-defined");
+                }
+            }).done(function(data) {
+                this.owner.CPU.reset();
+                this.owner.CPU.reg.PC = addr;
+                
+                this.reset();
+                var i, dataArr = new Uint8Array(data);
+                for (var i = 0; i < dataArr.length; i++, addr++) {
+                    this.ram[addr] = dataArr[i];
+                }
 
+                this.owner.VIC.reset();
+            }.bind(this));
+        },
+        reset: function() {
             this.busLock = 0;
             this.vicBank = 0;
             this.CHAREN = true;
             this.HIRAM = true;
             this.LORAM = true;
+        },
+        init: function() {
+            var i, j;
 
             this.ram = new Uint8Array(65536);
             this.romBasic = new Uint8Array(8192);
             this.romKernal = new Uint8Array(8192);
             this.charRom = new Uint8Array(4096);
 
+            this.reset();
             for (i = 0, j = this.charRomSrc.match(/.{2}/g); i < 4096; i++) {
                 this.charRom[i] = parseInt(j[i], 16);
             }
