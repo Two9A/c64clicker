@@ -61,6 +61,9 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0x200:
                 case 0x300:
                     return this.owner.VIC.io_r(addr);
+                case 0xC00:
+                case 0xD00:
+                    return this.owner.CIA.io_r(addr);
             }
         },
         io_w: function(addr, val) {
@@ -69,6 +72,9 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0x100:
                 case 0x200:
                 case 0x300:
+                    this.owner.VIC.io_w(addr, val);
+                case 0xC00:
+                case 0xD00:
                     this.owner.VIC.io_w(addr, val);
             }
         },
@@ -89,6 +95,7 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                     this.ram[addr] = dataArr[i];
                 }
 
+                this.owner.CIA.reset();
                 this.owner.VIC.reset();
             }.bind(this));
         },
