@@ -509,13 +509,6 @@ define(function() {
                 this.spriteRasters[i] = [];
             }
             
-            this.io_w(this.rg.FLAGS1, 0x9B);
-            this.io_w(this.rg.FLAGS2, 0x08);
-            this.io_w(this.rg.POINTERS, 0x14);
-            this.io_w(this.rg.IRQ, 0x0F);
-            this.io_w(this.rg.BORDER, 0x0E);
-            this.io_w(this.rg.BG0, 0x06);
-
             for (i = 0; i < 25; i++) {
                 for (j = 0; j < 40; j++) {
                     this.owner.MMU.ram[this.SCREENPTR * 1024 + i * 40 + j] = this.initialScreen[i].charCodeAt(j) - 64;
@@ -532,24 +525,6 @@ define(function() {
             for (i in this.effects) {
                 this.effects[i] = false;
             }
-
-            // Test sprite
-            j = [
-                0, 126, 0, 3, 255, 192, 7, 255, 224,
-                31, 255, 248, 31, 255, 248, 63, 255, 252,
-                127, 255, 254, 127, 254, 254, 255, 253, 255,
-                255, 251, 255, 255, 247, 255, 255, 239, 255,
-                255, 223, 255, 127, 191, 254, 127, 127, 254,
-                63, 255, 252, 31, 255, 248, 31, 255, 248,
-                7, 255, 224, 3, 255, 192, 0, 126, 0
-            ];
-            for (i = 0; i < 63; i++) {
-                this.owner.MMU.ram[0x3FC0 + i] = j[i];
-            }
-            this.owner.MMU.ram[this.SCREENPTR * 1024 + 1016] = 0xFF;
-            this.io_w(this.rg.SPRX0, 150);
-            this.io_w(this.rg.SPRY0, 150);
-            this.io_w(this.rg.SPRC0, 7);
         },
         init: function() {
             this.sizes.RASTER_LENGTH = this.sizes.HBL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBL;

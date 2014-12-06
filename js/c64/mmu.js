@@ -87,12 +87,23 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 }
             }).done(function(data) {
                 this.owner.CPU.reset();
-                this.owner.CPU.reg.PC = addr;
                 
                 this.reset();
                 var i, dataArr = new Uint8Array(data);
+                var dest;
+                switch (addr) {
+                    case 'KERNAL':
+                        dest = 'romKernal';
+                        addr = 0;
+                        break;
+                    default:
+                        dest = 'ram';
+                        this.romKernal[0x1FFC] = addr & 255;
+                        this.romKernal[0x1FFD] = addr >> 8;
+                        break;
+                }
                 for (var i = 0; i < dataArr.length; i++, addr++) {
-                    this.ram[addr] = dataArr[i];
+                    this[dest][addr] = dataArr[i];
                 }
 
                 this.owner.CIA.reset();
@@ -118,6 +129,7 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
             for (i = 0, j = this.charRomSrc.match(/.{2}/g); i < 4096; i++) {
                 this.charRom[i] = parseInt(j[i], 16);
             }
+            this.load('/rom/gamekern.bin', 'KERNAL');
         },
         charRomSrc: [
             '3c666e6e60623c00183c667e666666007c66667c66667c003c66606060663c00',
