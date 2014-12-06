@@ -1006,7 +1006,7 @@ define(function() {
             this.clock++;
             this.curCycle++;
             if (this.curOp.length == 0) {
-                if (this.signalled) {
+                if (this.signalled && !(this.reg.P & this.flags.I)) {
                     this.curOp.push(this.signalled);
                     this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
                     this.signalled = null;
@@ -1056,7 +1056,7 @@ define(function() {
                 A: 0,
                 X: 0,
                 Y: 0,
-                S: 0xFF,
+                S: 0,
                 P: 0x20,
 
                 // Might be useful for intermediate addressing steps

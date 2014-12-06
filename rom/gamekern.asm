@@ -1,6 +1,11 @@
     .code
 
 reset:
+    ; Stack setup
+    sei
+    ldx #$FF
+    txs
+
     ; VIC setup
     lda #$9b            ; Standard text mode
     sta $d011
@@ -31,9 +36,10 @@ sprlp:
     lda #$07            ; Sprite 0 is yellow
     sta $d027
 
+    cli
+
     ; We're done, spin forever
-busywait:
-    jmp busywait
+    jmp *
 
 sprdata:
     .byt 0, 126, 0, 3, 255, 192, 7, 255, 224
