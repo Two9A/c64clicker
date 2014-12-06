@@ -16,5 +16,11 @@ define([
             C64[i].init.call(C64[i]);
         }
     }
+    C64.reset = function() {
+        C64.MMU.reset();
+        C64.CPU.reset();
+        C64.CIA.reset();
+        C64.VIC.reset();
+    };
     return C64;
 });

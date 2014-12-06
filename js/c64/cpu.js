@@ -1,5 +1,9 @@
 define(function() {
     return {
+        VECTOR_INT: 0xFFFE,
+        VECTOR_RESET: 0xFFFC,
+        VECTOR_NMI: 0xFFFA,
+
         clock: null,
         printedTo: null,
 
@@ -7,6 +11,7 @@ define(function() {
         curCycle: null,
         reg: null,
         halted: null,
+        signalled: null,
         util: {
             setFlag: function(flag, cond) {
                 if (cond) {
@@ -40,6 +45,59 @@ define(function() {
                             return false;
                         }
                     }
+                }
+                return true;
+            },
+            push: function(val) {
+                this.owner.MMU.w(this.reg.S + 0x0100, val);
+                this.reg.S = (this.reg.S - 1) & 0x00FF;
+            },
+            pop: function() {
+                this.reg.S = (this.reg.S + 1) & 0x00FF;
+                return this.owner.MMU.r(this.reg.S + 0x0100);
+            },
+            interrupt: function(vector, brk_flag, reset_flag) {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = reset_flag ? 3 : 2;
+                        if (!reset_flag) {
+                            this.util.push.call(this, this.reg.PC >> 8);
+                        }
+                        return false;
+                    case 2:
+                        this.reg.tmp4 = 3;
+                        if (!reset_flag) {
+                            this.util.push.call(this, this.reg.PC & 255);
+                        }
+                        return false;
+                    case 3:
+                        this.reg.tmp4 = 4;
+                        if (reset_flag) {
+                            return false;
+                        }
+                        if (brk_flag) {
+                            this.reg.P |= this.flags.B;
+                        } else {
+                            this.reg.P &= (255 - this.flags.B);
+                        }
+                        this.util.push.call(this, this.reg.P);
+                        if (reset_flag) {
+                            this.reg.P &= (255 - this.flags.I);
+                        } else {
+                            this.reg.P |= this.flags.I;
+                        }
+                        return false;
+                    case 4:
+                        this.reg.tmp4 = 5;
+                        this.reg.addr = this.owner.MMU.r(vector);
+                        return false;
+                    case 5:
+                        this.reg.addr += (this.owner.MMU.r(vector + 1) << 8);
+                        this.reg.PC = this.reg.addr;
                 }
                 return true;
             }
@@ -131,7 +189,7 @@ define(function() {
                 return this.util.branch.call(this, this.flags.N, 0);
             },
             BRK: function() {
-                return true;
+                return this.util.interrupt.call(this, this.VECTOR_INT, true);
             },
             BVC: function() {
                 return this.util.branch.call(this, this.flags.V, 0);
@@ -219,6 +277,9 @@ define(function() {
                 this.util.setNZ.call(this, this.reg.Y);
                 return true;
             },
+            IRQ: function() {
+                return this.util.interrupt.call(this, this.VECTOR_INT);
+            },
             ISC: function() {
                 this.reg.writeflag = true;
                 // TODO: Undocumented
@@ -229,6 +290,18 @@ define(function() {
                 return true;
             },
             JSR: function() {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        this.util.push.call(this, this.reg.PC >> 8);
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = 2;
+                        this.util.push.call(this, this.reg.PC & 255);
+                        return false;
+                    case 2:
+                        this.reg.PC = this.reg.addr;
+                }
                 return true;
             },
             LAS: function() {
@@ -261,6 +334,9 @@ define(function() {
                 this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
+            NMI: function() {
+                return this.util.interrupt.call(this, this.VECTOR_NMI);
+            },
             NOP: function() {
                 // lol
                 return true;
@@ -271,15 +347,45 @@ define(function() {
                 return true;
             },
             PHA: function() {
+                if (!this.reg.tmp3) {
+                    this.reg.tmp3 = 1;
+                    return false;
+                }
+                this.util.push.call(this, this.reg.A);
                 return true;
             },
             PHP: function() {
+                if (!this.reg.tmp3) {
+                    this.reg.tmp3 = 1;
+                    return false;
+                }
+                this.util.push.call(this, this.reg.P);
                 return true;
             },
             PLA: function() {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = 2;
+                        return false;
+                    case 2:
+                        this.reg.A = this.util.pop.call(this);
+                }
                 return true;
             },
             PLP: function() {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = 2;
+                        return false;
+                    case 2:
+                        this.reg.P = this.util.pop.call(this);
+                }
                 return true;
             },
             RLA: function() {
@@ -313,10 +419,50 @@ define(function() {
                 // TODO: Undocumented
                 return true;
             },
+            RST: function() {
+                return this.util.interrupt.call(this, this.VECTOR_RESET, false, true);
+            },
             RTI: function() {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = 2;
+                        return false;
+                    case 2:
+                        this.reg.tmp4 = 3;
+                        this.reg.P = this.util.pop.call(this);
+                        return false;
+                    case 3:
+                        this.reg.tmp4 = 4;
+                        this.reg.addr = this.util.pop.call(this);
+                        return false;
+                    case 4:
+                        this.reg.addr += (this.util.pop.call(this) << 8);
+                        this.reg.PC = this.reg.addr;
+                }
                 return true;
             },
             RTS: function() {
+                switch (this.reg.tmp4) {
+                    case null:
+                        this.reg.tmp4 = 1;
+                        return false;
+                    case 1:
+                        this.reg.tmp4 = 2;
+                        return false;
+                    case 2:
+                        this.reg.tmp4 = 3;
+                        this.reg.addr = this.util.pop.call(this);
+                        return false;
+                    case 3:
+                        this.reg.tmp4 = 4;
+                        this.reg.addr += (this.util.pop.call(this) << 8);
+                        return false;
+                    case 4:
+                        this.reg.PC = (this.reg.addr + 1) & 0xFFFF;
+                }
                 return true;
             },
             SAX: function() {
@@ -541,7 +687,10 @@ define(function() {
                         this.curOp.push(this.owner.MMU.r(this.reg.PC));
                         this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
                         this.reg.addr = (this.curOp[2] << 8) + this.reg.tmp1;
-                        if (this.map[this.curOp[0]][0] == 'JMP') {
+                        if (
+                          this.map[this.curOp[0]][0] == 'JMP' ||
+                          this.map[this.curOp[0]][0] == 'JSR'
+                        ) {
                             // Operand not required
                             return true;
                         }
@@ -823,7 +972,9 @@ define(function() {
             ['BEQ','rel',2,2],['SBC','izy',2,5],['HLT','imp',1,2],['ISC','izy',2,8],
             ['NOP','zx', 2,4],['SBC','zx', 2,4],['INC','zx', 2,6],['ISC','zx', 2,6],
             ['SED','imp',1,2],['SBC','aby',3,4],['NOP','imp',1,2],['ISC','aby',3,7],
-            ['NOP','abx',3,4],['SBC','abx',3,4],['INC','abx',3,7],['ISC','abx',3,7]
+            ['NOP','abx',3,4],['SBC','abx',3,4],['INC','abx',3,7],['ISC','abx',3,7],
+
+            ['INT','imp',1,7],['RST','imp',1,6],['NMI','imp',1,7]
         ],
         flags: {
             N: 128,
@@ -834,6 +985,11 @@ define(function() {
             Z: 2,
             C: 1
         },
+        interruptSignals: {
+            'INT': 256,
+            'RST': 257,
+            'NMI': 258
+        },
         step: function() {
             var op; // [opcode, addr, size, time]
             if (this.halted) {
@@ -843,12 +999,21 @@ define(function() {
                 this.owner.MMU.busLock--;
                 return;
             }
+            if (!this.clock) {
+                this.signal('RST');
+            }
 
             this.clock++;
             this.curCycle++;
             if (this.curOp.length == 0) {
-                this.curOp.push(this.owner.MMU.r(this.reg.PC));
-                this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
+                if (this.signalled) {
+                    this.curOp.push(this.signalled);
+                    this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
+                    this.signalled = null;
+                } else {
+                    this.curOp.push(this.owner.MMU.r(this.reg.PC));
+                    this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
+                }
             } else {
                 op = this.map[this.curOp[0]];
                 if (this.addr[op[1]].call(this)) {
@@ -882,9 +1047,12 @@ define(function() {
                 }
             }
         },
+        signal: function(line) {
+            this.signalled = this.interruptSignals[line] || null;
+        },
         reset: function() {
             this.reg = {
-                PC: 0xFFFE,
+                PC: 0,
                 A: 0,
                 X: 0,
                 Y: 0,

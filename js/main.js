@@ -197,7 +197,7 @@ require([
             this.renderItems();
             this.showTab('units');
 
-            VIC.reset();
+            C64.reset();
         },
         inc: function(amt) {
             this.bank = this.bank.add(amt);
