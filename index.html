@@ -15,23 +15,23 @@
     <em>This is not a full simulation of a C64. Not yet, anyways.</em>
    </div>
   </div>
-  <div id="bank"></div>
-  <div id="cps"></div>
-  <div id="click">Render <span id="pixels_per_click"></span></div>
+  <div id="bank">&nbsp;</div>
+  <div id="cps">&nbsp;</div>
+  <div id="click">Reticulating splines...</div>
   <div class="content">
    <div class="sidebar">
     <div class="items">
      <ul class="tabs">
       <li rel="units">Oscillators</li>
       <li rel="upgrades">Upgrades</li>
-      <!--<li rel="achievements">Achievements</li>-->
+      <li rel="options">Options</li>
      </ul>
      <div class="itemlists">
       <ul class="units">
       </ul>
       <ul class="upgrades">
       </ul>
-      <ul class="achievements">
+      <ul class="options">
       </ul>
      </div>
     </div>
@@ -39,11 +39,9 @@
    <div class="screen">
     <canvas id="screen" width="504" height="312"></canvas>
     <ul class="status">
-     <li>Frame: <span id="curframe"></span></li>
-     <li>Raster: <span id="curraster"></span></li>
+     <li>Frame: <span id="curframe"></span>, raster: <span id="curraster"></span></li>
      <li>Clock speed: <span id="clock"></span></li>
      <li>Rendering: <span id="curperiod"></span></li>
-     <li>Reduce FPS: <input type="checkbox" id="lightmode"></input></li>
     </ul>
     <div id="reset">Hard Reset</div>
    </div>

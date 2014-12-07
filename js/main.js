@@ -154,6 +154,13 @@ require([
             price: 50331648
         }],
 
+        options: [{
+            name: 'Reduce FPS',
+            code: 'low_fps',
+            description: "If your computer's burning up, drop the rendering to 1 frame per second.",
+            set: false
+        }],
+
         frontCanvas: null,
         frontContext: null,
         intervals: null,
@@ -189,9 +196,13 @@ require([
                     this.maxPrice = BigInteger(this.upgrades[i].price);
                 }
             }
+            for (i in this.options) {
+                this.options[i].set = false;
+                this.optionHandlers[this.options[i].code].call(this, true);
+            }
             for (i in this.effects) {
                 this.effects[i] = false;
-                this.effectHandlers[i](true);
+                this.effectHandlers[i].call(this, true);
             }
 
             this.renderItems();
@@ -298,6 +309,14 @@ require([
                     $item.removeClass('available');
                 }
             }
+            for (i in this.options) {
+                $item = $('li#option' + i);
+                if (this.options[i].set) {
+                    $item.addClass('available');
+                } else {
+                    $item.removeClass('available');
+                }
+            }
 
             $('#bank').text(this.pluralize(bank.toString(), 'pixel'));
             $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
@@ -364,10 +383,18 @@ require([
                     VIC.effects[this.upgrades[i].effect_vic] = true;
                 } else if (this.upgrades[i].effect_main) {
                     this.effects[this.upgrades[i].effect_main] = true;
-                    this.effectHandlers[this.upgrades[i].effect_main]();
+                    this.effectHandlers[this.upgrades[i].effect_main].call(this);
                 }
                 this.upgrades[i].purchased = true;
                 $item.removeClass('active');
+            } else if ($item.parent().is('.options')) {
+                this.options[i].set = !this.options[i].set;
+                this.optionHandlers[this.options[i].code].call(this, !this.options[i].set);
+                if (this.options[i].set) {
+                    $item.addClass('available');
+                } else {
+                    $item.removeClass('available');
+                }
             }
         },
         renderItems: function() {
@@ -398,6 +425,13 @@ require([
                     ].join(''));
                 }
             }
+            for (i in this.options) {
+                $('ul.options').append([
+                    '<li id="option', i, '" class="active" title="', this.options[i].description, '">',
+                     '<span class="name">', this.options[i].name, '</span>',
+                    '</li>'
+                ].join(''));
+            }
             $('.itemlists li').off('click').on('click', function(e) {
                 this.buy($(e.target).closest('li'));
                 return false;
@@ -410,6 +444,23 @@ require([
                 } else {
                     $('body').addClass('quarterscreen');
                 }
+            }
+        },
+        optionHandlers: {
+            low_fps: function(disable) {
+                if (disable) {
+                    this.FPS = 40;
+                } else {
+                    this.FPS = 1;
+                }
+                this.cps_step = 0;
+                if (this.cps.compare(1048576) < 0) {
+                    this.cps_div = this.cps.toJSValue() / this.FPS;
+                } else {
+                    this.cps_div = this.cps.divide(this.FPS).toJSValue();
+                }
+                clearInterval(this.intervals.step);
+                this.intervals.step = setInterval(this.stepDraw.bind(this), 1000 / this.FPS);
             }
         },
         init: function() {
@@ -447,6 +498,12 @@ require([
             this.frontCanvas.height = VIC.sizes.RASTER_COUNT;
             this.frontContext = this.frontCanvas.getContext('2d');
 
+            this.intervals = {
+                step: setInterval(this.stepDraw.bind(this), 1000 / this.FPS),
+                calc: setInterval(this.stepCalc.bind(this), 1000),
+                save: setInterval(this.save.bind(this), 5000)
+            };
+
             this.reset();
             this.load();
             this.renderItems();
@@ -462,6 +519,7 @@ require([
             }).on('mouseleave', function() {
                 $(this).powerTip('hide');
             });
+            $('#click').html('Render <span id="pixels_per_click"></span>');
             $('#click').on('click', this.click.bind(this));
             $('.tabs li').on('click', function(e) {
                 this.showTab($(e.target).attr('rel'));
@@ -473,27 +531,6 @@ require([
                 }
                 return false;
             }.bind(this));
-            $('#lightmode').on('click', function(e) {
-                if ($('#lightmode').is(':checked')) {
-                    this.FPS = 1;
-                } else {
-                    this.FPS = 40;
-                }
-                this.cps_step = 0;
-                if (this.cps.compare(1048576) < 0) {
-                    this.cps_div = this.cps.toJSValue() / this.FPS;
-                } else {
-                    this.cps_div = this.cps.divide(this.FPS).toJSValue();
-                }
-                clearInterval(this.intervals.step);
-                this.intervals.step = setInterval(this.stepDraw.bind(this), 1000 / this.FPS);
-            }.bind(this));
-
-            this.intervals = {
-                step: setInterval(this.stepDraw.bind(this), 1000 / this.FPS),
-                calc: setInterval(this.stepCalc.bind(this), 1000),
-                save: setInterval(this.save.bind(this), 5000)
-            };
         },
         load: function() {
             if (!window.localStorage['c64click.bank']) {
@@ -519,7 +556,7 @@ require([
             }
             for (i in this.effects) {
                 this.effects[i] = !!(0|window.localStorage['c64click.effects.' + i]);
-                this.effectHandlers[i](!this.effects[i]);
+                this.effectHandlers[i].call(this, !this.effects[i]);
             }
             for (i in this.units) {
                 this.units[i].currPrice = BigInteger(window.localStorage['c64click.units.' + i + '.currPrice']);
@@ -528,8 +565,9 @@ require([
             for (i in this.upgrades) {
                 this.upgrades[i].purchased = !!(0|window.localStorage['c64click.upgrades.' + i + '.purchased']);
             }
-            if (this.FPS == 1) {
-                $('#lightmode').attr('checked', true)
+            for (i in this.options) {
+                this.options[i].set = !!(0|window.localStorage['c64click.options.' + i + '.set']);
+                this.optionHandlers[this.options[i].code].call(this, !this.options[i].set);
             }
         },
         save: function() {
@@ -558,6 +596,9 @@ require([
             }
             for (i in this.upgrades) {
                 state['upgrades.' + i + '.purchased'] = this.upgrades[i].purchased ? 1 : 0;
+            }
+            for (i in this.options) {
+                state['options.' + i + '.set'] = this.options[i].set ? 1 : 0;
             }
 
             for (i in state) {
