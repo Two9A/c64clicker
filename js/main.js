@@ -10,7 +10,8 @@ require([
     'c64',
     'thirdparty/domReady',
     'thirdparty/biginteger',
-    'thirdparty/jquery.powertip.min'
+    'thirdparty/jquery.powertip.min',
+    'thirdparty/jquery.nodoubletapzoom'
 ], function($, C64, domReady, bigint, powertip) {
     VIC = C64.VIC;
     window.CClicker = {
@@ -520,7 +521,7 @@ require([
                 $(this).powerTip('hide');
             });
             $('#click').html('Render <span id="pixels_per_click"></span>');
-            $('#click').on('click', this.click.bind(this));
+            $('#click').on('click', this.click.bind(this)).nodoubletapzoom();
             $('.tabs li').on('click', function(e) {
                 this.showTab($(e.target).attr('rel'));
                 return false;
