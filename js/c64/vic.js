@@ -32,6 +32,7 @@ define(function() {
         BG1:        null,
         BG2:        null,
         BG3:        null,
+        RASTERHIT:  null,
 
         SPR:        null,
 
@@ -96,6 +97,11 @@ define(function() {
                     this.DISPLAY = !!(val & 16);
                     this.HIRES = !!(val & 32);
                     this.EXTCOLOR = !!(val & 64);
+                    if (val & 128) {
+                        this.RASTERHIT |= 256;
+                    } else {
+                        this.RASTERHIT &= 255;
+                    }
                     if (this.RSEL) {
                         this.sizes.BORDERV = 42;
                         this.sizes.HEIGHT = 200;
@@ -105,7 +111,8 @@ define(function() {
                     }
                     this.fillRasterModes();
                     break;
-                case 18: // RASTER is readonly
+                case 18: // RASTER
+                    this.RASTERHIT = (this.RASTERHIT & 256) | val;
                     break;
                 case 19: // LPX and
                 case 20: // LPY not supported
@@ -140,8 +147,9 @@ define(function() {
                     this.SCREENPTR = (val & 240) >> 4;
                     this.CHARPTR = (val & 14) >> 1;
                     break;
-                case 25: // IRQ is readonly
-                    break;
+                case 25: // IRQ clears when written
+                    this.registers[addr] = 0;
+                    return;
                 case 26: // IRM
                     this.IRM = val;
                     break;
@@ -390,6 +398,11 @@ define(function() {
                     this.registers[this.rg.FLAGS0] = (y & 256) ?
                         (this.registers[this.rg.FLAGS0] | 128) :
                         (this.registers[this.rg.FLAGS0] & 127);
+
+                    if ((this.IRM & 1) && this.RASTERHIT == y) {
+                        this.registers[this.rg.IRQ] |= 0x81;
+                        this.owner.CPU.signal('INT');
+                    }
                 }
 
                 if (step == 8) {

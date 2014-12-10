@@ -19,6 +19,10 @@ reset:
     sta $d020
     lda #$06            ; Dark blue background
     sta $d021
+    lda #3              ; Interrupt at line 259
+    sta $d012           ; (start of bottom border)
+
+    cli                 ; Turn interrupts back on
 
     ; Sprite loading
     ldx #62
@@ -41,6 +45,10 @@ sprlp:
     ; We're done, spin forever
     jmp *
 
+; Raster interrupt handler!
+raster:
+    rti
+
 sprdata:
     .byt 0, 126, 0, 3, 255, 192, 7, 255, 224
     .byt 31, 255, 248, 31, 255, 248, 63, 255, 252
@@ -54,4 +62,4 @@ sprdata:
     .segment "VECTORS"
     .word $0000
     .word $e000
-    .word $0000
+    .word raster

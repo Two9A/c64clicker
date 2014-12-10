@@ -267,6 +267,9 @@ define(function() {
                 this.util.setNZ.call(this, this.reg.operand);
                 return true;
             },
+            INT: function() {
+                return this.util.interrupt.call(this, this.VECTOR_INT);
+            },
             INX: function() {
                 this.reg.X = (this.reg.X + 1) & 255;
                 this.util.setNZ.call(this, this.reg.X);
@@ -276,9 +279,6 @@ define(function() {
                 this.reg.Y = (this.reg.Y + 1) & 255;
                 this.util.setNZ.call(this, this.reg.Y);
                 return true;
-            },
-            IRQ: function() {
-                return this.util.interrupt.call(this, this.VECTOR_INT);
             },
             ISC: function() {
                 this.reg.writeflag = true;
