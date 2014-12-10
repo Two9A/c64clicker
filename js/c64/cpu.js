@@ -1050,6 +1050,20 @@ define(function() {
         signal: function(line) {
             this.signalled = this.interruptSignals[line] || null;
         },
+        getState: function() {
+            return {
+                clock: this.clock,
+                curOp: this.curOp.slice(0),
+                curCycle: 0 + this.curCycle,
+                reg: $.extend({}, this.reg)
+            };
+        },
+        setState: function(state) {
+            this.clock = state.clock;
+            this.curOp = state.curOp.slice(0);
+            this.curCycle = state.curCycle;
+            this.reg = $.extend({}, state.reg);
+        },
         reset: function() {
             this.reg = {
                 PC: 0,

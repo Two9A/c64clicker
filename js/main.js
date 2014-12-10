@@ -216,11 +216,11 @@ require([
             this.produced = this.produced.add(amt);
             this.thisFrame = this.thisFrame.add(amt);
             while (this.thisFrame.compare(VIC.sizes.FRAME_SIZE) >= 0) {
-                VIC.restoreFrame(this.frames.toJSValue());
+                C64.restoreFrame(this.frames.toJSValue());
                 VIC.renderFrame(VIC.sizes.FRAME_SIZE);
                 this.thisFrame = this.thisFrame.subtract(VIC.sizes.FRAME_SIZE);
                 this.frames = this.frames.next();
-                VIC.saveFrame(
+                C64.saveFrame(
                     this.frames.toJSValue(),
                     this.maxPrice.divide(VIC.sizes.FRAME_SIZE).toJSValue()
                 );
@@ -257,11 +257,11 @@ require([
             thisFrame = this.thisFrame.add(cps_amt);
             frames = this.frames;
             while (thisFrame.compare(VIC.sizes.FRAME_SIZE) >= 0) {
-                VIC.restoreFrame(frames.toJSValue());
+                C64.restoreFrame(frames.toJSValue());
                 VIC.renderFrame(VIC.sizes.FRAME_SIZE);
                 thisFrame = thisFrame.subtract(VIC.sizes.FRAME_SIZE);
                 frames = frames.next();
-                VIC.saveFrame(
+                C64.saveFrame(
                     frames.toJSValue(),
                     this.maxPrice.divide(VIC.sizes.FRAME_SIZE).toJSValue()
                 );
@@ -270,7 +270,7 @@ require([
             // We're running a system here, and it may change state mid-frame,
             // so we have to run it from the start of frame to render it
             var renderEndpoint = 0;
-            VIC.restoreFrame(frames.toJSValue());
+            C64.restoreFrame(frames.toJSValue());
             if (bank.isPositive()) {
                 renderEndpoint = VIC.renderFrame(thisFrame.toJSValue());
             }

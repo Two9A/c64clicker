@@ -414,38 +414,14 @@ define(function() {
             this.backContext.putImageData(imageData, 0, 0);
             return mode;
         },
-        saveFrame: function(frame, numFrames) {
-            var i;
-            if (this.renderedFrames[frame]) {
-                return;
-            }
-            if (numFrames > 2) {
-                numFrames = 2;
-            }
-            
-            this.renderedFrames[frame] = {
-                VIC: {
-                    image: this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT),
-                    colorRam: new Uint8Array(this.colorRam)
-                },
-                CPU: {
-                    clock: this.owner.CPU.clock,
-                    curOp: this.owner.CPU.curOp.slice(0),
-                    curCycle: this.owner.CPU.curCycle,
-                    reg: $.extend({}, this.owner.CPU.reg)
-                },
-                MMU: {
-                    ram: new Uint8Array(this.owner.MMU.ram),
-                    busLock: this.owner.MMU.busLock
-                }
+        getState: function() {
+            var ret = {
+                image: this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT),
+                colorRam: new Uint8Array(this.colorRam),
+                registers: this.registers.slice(0)
             };
 
-            for (i in this.renderedFrames) {
-                if (i > 0 && i < (frame - numFrames)) {
-                    delete this.renderedFrames[i];
-                }
-            }
-
+            // TODO: These in the kernel ROM instead
             this.rasterbarsValues = [];
             for (i = 0; i < this.sizes.RASTER_COUNT; i+=8) {
                 this.rasterbarsValues.push(Math.floor(Math.random()*16));
@@ -454,21 +430,14 @@ define(function() {
                 this.XSCROLL = Math.floor(Math.random() * 8);
                 this.YSCROLL = Math.floor(Math.random() * 8);
             }
+            return ret;
         },
-        restoreFrame: function(frame) {
-            if (!this.renderedFrames[frame]) {
-                frame = 0;
+        setState: function(state) {
+            this.backContext.putImageData(state.image, 0, 0);
+            this.colorRam = new Uint8Array(state.colorRam);
+            for (i in state.registers) {
+                this.io_w(i, state.registers[i]);
             }
-            this.backContext.putImageData(this.renderedFrames[frame].VIC.image, 0, 0);
-            this.colorRam = new Uint8Array(this.renderedFrames[frame].VIC.colorRam);
-
-            this.owner.CPU.clock = this.renderedFrames[frame].CPU.clock;
-            this.owner.CPU.curOp = this.renderedFrames[frame].CPU.curOp.slice(0);
-            this.owner.CPU.curCycle = this.renderedFrames[frame].CPU.curCycle;
-            this.owner.CPU.reg = $.extend({}, this.renderedFrames[frame].CPU.reg);
-
-            this.owner.MMU.ram = new Uint8Array(this.renderedFrames[frame].MMU.ram);
-            this.owner.MMU.busLock = this.renderedFrames[frame].MMU.busLock;
         },
         fillRasterModes: function() {
             var i, j;
@@ -522,18 +491,9 @@ define(function() {
                 this.spriteRasters[i] = [];
             }
             
-            for (i = 0; i < 25; i++) {
-                for (j = 0; j < 40; j++) {
-                    this.owner.MMU.ram[this.SCREENPTR * 1024 + i * 40 + j] = this.initialScreen[i].charCodeAt(j) - 64;
-                    this.colorRam[i * 40 + j] = 14;
-                }
-            }
-            this.owner.MMU.ram[this.SCREENPTR * 1024 + 240] = 224;
-
             this.renderedFrames = {};
             this.backContext.fillStyle = 'black';
             this.backContext.fillRect(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
-            this.saveFrame(0, 1);
 
             for (i in this.effects) {
                 this.effects[i] = false;
@@ -695,33 +655,6 @@ define(function() {
             'Horizontal blanking',
             'Border',
             'Screen'
-        ],
-        initialScreen: [
-            '````````````````````````````````````````',
-            '````jjjj`COMMODORE`vt`BASIC`Vr`jjjj`````',
-            '````````````````````````````````````````',
-            '`vtK`RAM`SYSTEM``sxyqq`BASIC`BYTES`FREE`',
-            '````````````````````````````````````````',
-            'READYn``````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
-            '````````````````````````````````````````',
         ]
     };
 });

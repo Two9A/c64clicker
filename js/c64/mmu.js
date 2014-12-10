@@ -61,6 +61,11 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0x200:
                 case 0x300:
                     return this.owner.VIC.io_r(addr);
+                case 0x800:
+                case 0x900:
+                case 0xA00:
+                case 0xB00:
+                    return this.owner.VIC.colorRam[addr & 0x03FF];
                 case 0xC00:
                 case 0xD00:
                     return this.owner.CIA.io_r(addr);
@@ -73,9 +78,20 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0x200:
                 case 0x300:
                     this.owner.VIC.io_w(addr, val);
+                    break;
+                case 0x800:
+                case 0x900:
+                case 0xA00:
+                case 0xB00:
+                    if ((addr & 0x03FF) >= 1000) {
+                        return;
+                    }
+                    this.owner.VIC.colorRam[addr & 0x03FF] = val & 15;
+                    break;
                 case 0xC00:
                 case 0xD00:
-                    this.owner.VIC.io_w(addr, val);
+                    this.owner.CIA.io_w(addr, val);
+                    break;
             }
         },
         load: function(file, addr) {
@@ -108,7 +124,18 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
 
                 this.owner.CIA.reset();
                 this.owner.VIC.reset();
+                this.owner.saveFrame(0, 1);
             }.bind(this));
+        },
+        getState: function() {
+            return {
+                ram: new Uint8Array(this.ram),
+                busLock: this.busLock + 0
+            };
+        },
+        setState: function(state) {
+            this.ram = new Uint8Array(state.ram);
+            this.busLock = 0 + state.busLock;
         },
         reset: function() {
             this.busLock = 0;

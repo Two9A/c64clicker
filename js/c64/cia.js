@@ -2,11 +2,12 @@ define(function() {
     return {
         JOY_UP: 1,
         JOY_DOWN: 2,
-        JOY_LEFT: 4,
-        JOY_RIGHT: 8,
+        JOY_RIGHT: 4,
+        JOY_LEFT: 8,
         JOY_FIRE: 16,
 
         currJoyPort: null,
+        currJoyState: null,
 
         registers: [
             // CIA1: peripherals/IRQ
@@ -53,6 +54,23 @@ define(function() {
         io_r: function(addr) {
             var chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
+            switch (chip) {
+                case 0:
+                    switch (addr) {
+                        case 0:
+                        case 1:
+                            if (this.currJoyPort == addr) {
+                                this.registers[chip][addr] &= 0xE0;
+                                this.registers[chip][addr] |= this.currJoyState;
+                            }
+                            break;
+                    }
+                    break;
+                case 1:
+                    switch (addr) {
+                    }
+                    break;
+            }
             return this.registers[chip][addr];
         },
         io_w: function(addr, val) {
@@ -64,41 +82,57 @@ define(function() {
             keydown: function(e) {
                 switch (e.keyCode) {
                     case 37:
-                        this.registers[0][this.currJoyPort] &= (255 - this.JOY_LEFT);
+                        this.currJoyState &= (255 - this.JOY_LEFT);
                         break;
                     case 38:
-                        this.registers[0][this.currJoyPort] &= (255 - this.JOY_UP);
+                        this.currJoyState &= (255 - this.JOY_UP);
                         break;
                     case 39:
-                        this.registers[0][this.currJoyPort] &= (255 - this.JOY_RIGHT);
+                        this.currJoyState &= (255 - this.JOY_RIGHT);
                         break;
                     case 40:
-                        this.registers[0][this.currJoyPort] &= (255 - this.JOY_DOWN);
+                        this.currJoyState &= (255 - this.JOY_DOWN);
                         break;
                     case 32:
-                        this.registers[0][this.currJoyPort] &= (255 - this.JOY_FIRE);
+                        this.currJoyState &= (255 - this.JOY_FIRE);
                         break;
                 }
             },
             keyup: function(e) {
                 switch (e.keyCode) {
                     case 37:
-                        this.registers[0][this.currJoyPort] |= this.JOY_LEFT;
+                        this.currJoyState |= this.JOY_LEFT;
                         break;
                     case 38:
-                        this.registers[0][this.currJoyPort] |= this.JOY_UP;
+                        this.currJoyState |= this.JOY_UP;
                         break;
                     case 39:
-                        this.registers[0][this.currJoyPort] |= this.JOY_RIGHT;
+                        this.currJoyState |= this.JOY_RIGHT;
                         break;
                     case 40:
-                        this.registers[0][this.currJoyPort] |= this.JOY_DOWN;
+                        this.currJoyState |= this.JOY_DOWN;
                         break;
                     case 32:
-                        this.registers[0][this.currJoyPort] |= this.JOY_FIRE;
+                        this.currJoyState |= this.JOY_FIRE;
                         break;
                 }
             }
+        },
+        getState: function() {
+            return {
+                CIA1: this.registers[0].slice(0),
+                CIA2: this.registers[1].slice(0)
+            }
+        },
+        setState: function(state) {
+            for (i in state.CIA1) {
+                this.io_w(i, state.CIA1[i]);
+            }
+            for (i in state.CIA2) {
+                this.io_w(0x0100 + i, state.CIA2[i]);
+            }
+            this.registers[0][this.currJoyPort] &= 0xE0;
+            this.registers[0][this.currJoyPort] |= this.currJoyState;
         },
         reset: function() {
             // All pins are pulled high on the data ports
@@ -108,6 +142,7 @@ define(function() {
             this.registers[1][1] = 255;
 
             this.currJoyPort = 0;
+            this.currJoyState = 31;
         },
         init: function() {
             this.reset();
