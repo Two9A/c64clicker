@@ -34,6 +34,13 @@ reset:
     lda #3              ; Interrupt at line 259
     sta $d012           ; (start of bottom border)
 
+    ;--- CIA interrupt disabling ------------------------------------------
+    lda #$7f
+    sta $dc0d
+    sta $dd0d           ; Disable interrupts on both CIAs
+    lda $dc0d
+    lda $dd0d           ; Acknowledge interrupts on both CIAs
+
     cli                 ; Turn interrupts back on
 
     ;--- Screen clearing and initial print --------------------------------
@@ -143,6 +150,12 @@ sprlp:
 ;--------------------------------------------------------------------------
 ; Raster interrupt handler!
 handler_vblank:
+    pha
+    txa
+    pha
+    tya
+    pha
+
     dec $d019           ; Acknowledge
     ldx $dc00           ; Get Joy2's status
 
@@ -189,8 +202,14 @@ vbl_end:
     sta $d000
     lda SPR_X_HI
     sta $d010
-    lda SPR_Y
-    sta $d001
+    ldx SPR_Y
+    stx $d001
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 ;--------------------------------------------------------------------------

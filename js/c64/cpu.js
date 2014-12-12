@@ -57,6 +57,9 @@ define(function() {
                 return this.owner.MMU.r(this.reg.S + 0x0100);
             },
             interrupt: function(vector, brk_flag, reset_flag) {
+                // This gets a bit messy, handling all the int types:
+                // BRK changes PC, and sets the B flag
+                // RESET doesn't push PC, and doesn't set I
                 switch (this.reg.tmp4) {
                     case null:
                         this.reg.tmp4 = 1;
@@ -64,6 +67,10 @@ define(function() {
                         return false;
                     case 1:
                         this.reg.tmp4 = reset_flag ? 3 : 2;
+                        if (!brk_flag) {
+                            // Rewind the changes made in previous cycles
+                            this.reg.PC = (this.reg.PC - 2) & 0xFFFF;
+                        }
                         if (!reset_flag) {
                             this.util.push.call(this, this.reg.PC >> 8);
                         }

@@ -34,6 +34,13 @@ define(function() {
         BG3:        null,
         RASTERHIT:  null,
 
+        stateVars: [
+            'SCREENPTR', 'CHARPTR', 'IRM', 'RSEL', 'CSEL',
+            'DISPLAY', 'HIRES', 'EXTCOLOR', 'MULTICOLOR',
+            'XSCROLL', 'YSCROLL', 'BORDER', 'BG0', 'BG1',
+            'BG2', 'BG3', 'RASTERHIT'
+        ],
+
         SPR:        null,
 
         r: function(addr) {
@@ -276,7 +283,14 @@ define(function() {
                 }
 
                 // BUGBUG: This obviously doesn't allow for hyperscreen
-                switch (this.rasterModes[y]) {
+                if (!this.rasterModes[y]) {
+                    // Display hasn't been set up yet
+                    imageData.data[pos++] = 0x40;
+                    imageData.data[pos++] = 0x40;
+                    imageData.data[pos++] = 0x40;
+                    imageData.data[pos++] = 0xFF;
+                }
+                else switch (this.rasterModes[y]) {
                     // VBlank
                     case 1:
                         mode = 1;
@@ -415,11 +429,17 @@ define(function() {
             return mode;
         },
         getState: function() {
-            var ret = {
+            var i, ret = {
                 image: this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT),
                 colorRam: new Uint8Array(this.colorRam),
-                registers: this.registers.slice(0)
+                registers: this.registers.slice(0),
+                spriteRasters: this.spriteRasters.slice(0),
+                rasterModes: this.rasterModes.slice(0),
+                SPR: this.SPR.slice(0)
             };
+            for (i in this.stateVars) {
+                ret[this.stateVars[i]] = this[this.stateVars[i]];
+            }
 
             // TODO: These in the kernel ROM instead
             this.rasterbarsValues = [];
@@ -435,8 +455,14 @@ define(function() {
         setState: function(state) {
             this.backContext.putImageData(state.image, 0, 0);
             this.colorRam = new Uint8Array(state.colorRam);
+            this.spriteRasters = state.spriteRasters.slice(0);
+            this.rasterModes = state.rasterModes.slice(0);
+            this.SPR = state.SPR.slice(0);
             for (i in state.registers) {
-                this.io_w(i, state.registers[i]);
+                this.registers[i] = state.registers[i];
+            }
+            for (i in this.stateVars) {
+                this[this.stateVars[i]] = state[this.stateVars[i]];
             }
         },
         fillRasterModes: function() {
