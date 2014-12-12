@@ -5,12 +5,19 @@
 
 .code
 
-SPR_X_LO = $10
-SPR_X_HI = $11
-SPR_Y    = $12
-SCR_RAM  = $13
-COL_RAM  = $15
-SCR_RAM2 = $15
+GAMEFLAGS = $02
+SPR_X_LO  = $10
+SPR_X_HI  = $11
+SPR_Y     = $12
+SCR_RAM   = $13
+COL_RAM   = $15
+SCR_RAM2  = $15
+RASTER_LO = $17
+RASTER_HI = $18
+BORDERCOL = $19
+SCROLLPOS = $1A
+
+TMP0      = $30
 
 reset:
     ;--- Stack setup ------------------------------------------------------
@@ -31,8 +38,11 @@ reset:
     sta $d020
     lda #$06            ; Dark blue background
     sta $d021
-    lda #3              ; Interrupt at line 259
-    sta $d012           ; (start of bottom border)
+    lda #44             ; Interrupt at line 300
+    sta $d012           ; (within vblank)
+    sta RASTER_LO
+    lda #1
+    sta RASTER_HI       ; And store 304 for the IRQ
 
     ;--- CIA interrupt disabling ------------------------------------------
     lda #$7f
@@ -154,27 +164,107 @@ handler_vblank:
     txa
     pha
     tya
-    pha
-
+    pha                 ; Save state
     dec $d019           ; Acknowledge
+
+    ;--- Change the border color ------------------------------------------
+vbl_bars:
+    lda GAMEFLAGS
+    and #1              ; Bit 0 of GAMEFLAGS
+    beq vbl_inc         ; is "rasterbars on"
+    lda BORDERCOL
+    adc #3
+    sta BORDERCOL
+    sta $d020
+
+    ;--- Increment raster trap point by 12 --------------------------------
+vbl_inc:
+    lda $d011
+    and #$7f
+    sta TMP0
+
+    lda RASTER_LO
+    clc
+    adc #12
+    sta RASTER_LO       ; Add 12 to the low byte
+    sta $d012           ; And write to VIC
+    lda RASTER_HI
+    adc #0
+    and #1
+    sta RASTER_HI
+    clc
+    ror
+    ror
+    ora TMP0
+    sta $d011
+
+    lda RASTER_HI
+    beq vbl_notop       ; If the high bit is 1,
+    lda RASTER_LO
+    cmp #56             ; and the low byte is
+    bcc vbl_notop       ; >= 56, then
+    lda #0              
+    sta RASTER_LO
+    sta RASTER_HI       ; Go back to the top
+    sta $d012           ; And (wastefully!) go back
+    lda $d011           ; through the VIC's 9 bits
+    and #$7f            ; of RASTER to reset them
+    sta $d011
+    jmp vbl_frame       ; Then do the per-frame work
+
+vbl_notop:
+    jmp vbl_end         ; Otherwise skip all this!
+
+    ;--- Per-frame events: scrollshake ------------------------------------
+vbl_frame:
+    lda GAMEFLAGS
+    and #2              ; Bit 1 of GAMEFLAGS
+    beq vbl_kb          ; is "scrollshake on"
+    lda SCROLLPOS
+    clc
+    adc #$1b            ; Add 3 to Y, and 5 to X
+    sta SCROLLPOS       ; to simulate "random"
+    tax
+
+    lda $d016
+    and #$f8            ; Mask off and save the
+    sta TMP0            ; top 5 bits of D016
+    txa
+    and #7              ; Mask in the X component
+    ora TMP0            ; And tack them together
+    sta $d016
+
+    lda $d011
+    and #$f8            ; Do the same for D011
+    sta TMP0
+    txa
+    lsr                 ; This time, push the
+    lsr                 ; Y component into place
+    lsr                 ; before we do the masking
+    and #7              ; of the bottom 3 bits
+    ora TMP0            ; Tack them together too
+    sta $d011
+
+    ;--- Per-frame events: Move sprite by joystick direction --------------
+vbl_kb:
     ldx $dc00           ; Get Joy2's status
 
-vbl_up:
+vbl_kb_up:
     txa
     and #1
-    bne vbl_down
+    bne vbl_kb_down
     dec SPR_Y
 
-vbl_down:
+vbl_kb_down:
     txa
     and #2
-    bne vbl_right
+    bne vbl_kb_right
     inc SPR_Y
 
-vbl_right:
+vbl_kb_right:
     txa
     and #4
-    bne vbl_left
+    bne vbl_kb_left
     lda SPR_X_LO
     clc
     adc #1
@@ -184,10 +274,10 @@ vbl_right:
     and #1
     sta SPR_X_HI
 
-vbl_left:
+vbl_kb_left:
     txa
     and #8
-    bne vbl_end
+    bne vbl_kb_end
     lda SPR_X_LO
     clc
     sbc #1
@@ -197,7 +287,7 @@ vbl_left:
     and #1
     sta SPR_X_HI
 
-vbl_end:
+vbl_kb_end:
     lda SPR_X_LO
     sta $d000
     lda SPR_X_HI
@@ -205,6 +295,7 @@ vbl_end:
     ldx SPR_Y
     stx $d001
 
+vbl_end:
     pla
     tay
     pla

@@ -1,16 +1,11 @@
 define(function() {
     return {
-        effects: {
-            rasterbars: false,
-            scrollshake: false
-        },
         colorRam: null,
         curLineScr: null,
         curLineCol: null,
         curLineSpr: null,
         spriteRasters: [],
         rasterModes: [],
-        rasterbarsValues: null,
 
         backCanvas: null,
         backContext: null,
@@ -234,11 +229,13 @@ define(function() {
                 this.curLineScr[j] = 32;
             }
 
-            do {
-                if (x == 0 && this.effects.rasterbars) {
-                    this.io_w(this.rg.BORDER, this.rasterbarsValues[y>>3]);
-                }
+            // Catch raster IRQ at line 0
+            if ((this.IRM & 1) && this.RASTERHIT === 0) {
+                this.registers[this.rg.IRQ] |= 0x81;
+                this.owner.CPU.signal('INT');
+            }
 
+            do {
                 left_border = this.sizes.HBL + this.sizes.BORDERL;
                 right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBL;
 
@@ -440,16 +437,6 @@ define(function() {
             for (i in this.stateVars) {
                 ret[this.stateVars[i]] = this[this.stateVars[i]];
             }
-
-            // TODO: These in the kernel ROM instead
-            this.rasterbarsValues = [];
-            for (i = 0; i < this.sizes.RASTER_COUNT; i+=8) {
-                this.rasterbarsValues.push(Math.floor(Math.random()*16));
-            }
-            if (this.effects.scrollshake) {
-                this.XSCROLL = Math.floor(Math.random() * 8);
-                this.YSCROLL = Math.floor(Math.random() * 8);
-            }
             return ret;
         },
         setState: function(state) {
@@ -520,10 +507,6 @@ define(function() {
             this.renderedFrames = {};
             this.backContext.fillStyle = 'black';
             this.backContext.fillRect(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
-
-            for (i in this.effects) {
-                this.effects[i] = false;
-            }
         },
         init: function() {
             this.sizes.RASTER_LENGTH = this.sizes.HBL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBL;

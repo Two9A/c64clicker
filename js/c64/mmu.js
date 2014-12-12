@@ -14,6 +14,14 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
         r: function(addr) {
             switch (addr & 0xF000) {
                 case 0x0000:
+                    if (addr == 0x0002) {
+                        return (
+                            (this.owner.game.effects.rasterbars ? 1 : 0) +
+                            (this.owner.game.effects.scrollshake ? 2 : 0)
+                        );
+                    } else {
+                        return this.ram[addr];
+                    }
                 case 0x1000:
                 case 0x2000:
                 case 0x3000:

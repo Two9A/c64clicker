@@ -120,7 +120,7 @@ require([
         },{
             name: 'Raster-bars',
             description: "LOADING... (random border color every 8 lines)",
-            effect_vic: 'rasterbars',
+            effect_main: 'rasterbars',
             displayAt: 80000,
             price: 157248
         },{
@@ -132,7 +132,7 @@ require([
         },{
             name: '[C64 intensifies]',
             description: "Oh Lord there's a quake! (random character offset per frame)",
-            effect_vic: 'scrollshake',
+            effect_main: 'scrollshake',
             displayAt: 1048576,
             price: 1572840
         },{
@@ -166,6 +166,8 @@ require([
         frontContext: null,
         intervals: null,
         effects: {
+            rasterbars: false,
+            scrollshake: false,
             quarterscreen: false
         },
         thread: null,
@@ -439,6 +441,10 @@ require([
             }.bind(this)).powerTip();
         },
         effectHandlers: {
+            rasterbars: function(disable) {
+            },
+            scrollshake: function(disable) {
+            },
             quarterscreen: function(disable) {
                 if (disable) {
                     $('body').removeClass('quarterscreen');
