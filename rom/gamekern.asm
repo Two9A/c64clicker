@@ -1,7 +1,7 @@
 .segment "VECTORS"
     .word $0000
     .word $e000
-    .word handler_vblank
+    .word handler_raster
 
 .code
 
@@ -14,10 +14,11 @@ COL_RAM   = $15
 SCR_RAM2  = $15
 RASTER_LO = $17
 RASTER_HI = $18
-BORDERCOL = $19
+RASTERBAR = $19
 SCROLLPOS = $1A
 
 TMP0      = $30
+TMP1      = $31
 
 reset:
     ;--- Stack setup ------------------------------------------------------
@@ -28,6 +29,8 @@ reset:
     ;--- VIC setup --------------------------------------------------------
     lda #$9b            ; Standard text mode
     sta $d011
+    and #$7f
+    sta TMP1
     lda #$08            ; 40-column borders
     sta $d016
     lda #$14            ; Char ROM/screen RAM in
@@ -43,6 +46,8 @@ reset:
     sta RASTER_LO
     lda #1
     sta RASTER_HI       ; And store 304 for the IRQ
+    lda #0
+    sta RASTERBAR       ; Start off with no rasterbars
 
     ;--- CIA interrupt disabling ------------------------------------------
     lda #$7f
@@ -159,64 +164,60 @@ sprlp:
 
 ;--------------------------------------------------------------------------
 ; Raster interrupt handler!
-handler_vblank:
+handler_raster:
     pha
-    txa
-    pha
-    tya
-    pha                 ; Save state
     dec $d019           ; Acknowledge
 
     ;--- Change the border color ------------------------------------------
-vbl_bars:
-    lda GAMEFLAGS
-    and #1              ; Bit 0 of GAMEFLAGS
-    beq vbl_inc         ; is "rasterbars on"
-    lda BORDERCOL
-    adc #3
-    sta BORDERCOL
+raster_bars:
+    lda $d020
+    adc RASTERBAR
     sta $d020
 
     ;--- Increment raster trap point by 12 --------------------------------
-vbl_inc:
-    lda $d011
-    and #$7f
-    sta TMP0
-
-    lda RASTER_LO
-    clc
-    adc #12
-    sta RASTER_LO       ; Add 12 to the low byte
-    sta $d012           ; And write to VIC
-    lda RASTER_HI
-    adc #0
-    and #1
-    sta RASTER_HI
-    clc
-    ror
-    ror
-    ora TMP0
-    sta $d011
-
-    lda RASTER_HI
-    beq vbl_notop       ; If the high bit is 1,
-    lda RASTER_LO
-    cmp #56             ; and the low byte is
-    bcc vbl_notop       ; >= 56, then
-    lda #0              
+raster_inc:
+    lda $d012
+    adc #12             ; (Carry is cleared above)
     sta RASTER_LO
-    sta RASTER_HI       ; Go back to the top
-    sta $d012           ; And (wastefully!) go back
-    lda $d011           ; through the VIC's 9 bits
-    and #$7f            ; of RASTER to reset them
+    sta $d012           ; And write to VIC
+    lda RASTER_HI       ; 16-bit addition
+    adc #0
+    sta RASTER_HI
+    ror                 ; Again, carry is clear, so
+    ror                 ; this rotates bit 0 to bit 7
+    ora TMP1            ; Set the original VIC flags
     sta $d011
-    jmp vbl_frame       ; Then do the per-frame work
 
-vbl_notop:
-    jmp vbl_end         ; Otherwise skip all this!
+    rol
+    bcc raster_notop    ; If the high bit is 1,
+    lda RASTER_LO
+    cmp #50             ; and the low byte is
+    bcc raster_notop    ; >= 44 or so, then
+    lda #1              
+    sta $d012
+    sta RASTER_LO
+    lda #0
+    sta RASTER_HI       ; Go back to the top (line 1)
+    lda TMP1
+    sta $d011
+    bne vbl_frame       ; Skip over to do the per-frame work
+
+raster_notop:
+    pla
+    rti                 ; Leaving the handler early!
 
     ;--- Per-frame events: scrollshake ------------------------------------
 vbl_frame:
+    txa
+    pha
+
+    lda GAMEFLAGS
+    and #1              ; Bit 0 of GAMEFLAGS
+    beq vbl_shake       ; is "rasterbars on"
+    lda #3              ; If it's on, we'll add 3 to
+    sta RASTERBAR       ; the color every 12 lines
+
+vbl_shake:
     lda GAMEFLAGS
     and #2              ; Bit 1 of GAMEFLAGS
     beq vbl_kb          ; is "scrollshake on"
@@ -244,6 +245,8 @@ vbl_frame:
     and #7              ; of the bottom 3 bits
     ora TMP0            ; Tack them together too
     sta $d011
+    and #$7f
+    sta TMP1
 
     ;--- Per-frame events: Move sprite by joystick direction --------------
 vbl_kb:
@@ -251,23 +254,23 @@ vbl_kb:
 
 vbl_kb_up:
     txa
-    and #1
+    and #1              ; Check bit 0 (UP)
     bne vbl_kb_down
-    dec SPR_Y
+    dec SPR_Y           ; If it's set, move up
 
 vbl_kb_down:
     txa
-    and #2
+    and #2              ; Check bit 1 (DOWN)
     bne vbl_kb_right
-    inc SPR_Y
+    inc SPR_Y           ; If it's set, move down
 
 vbl_kb_right:
     txa
-    and #4
+    and #8              ; Check bit 3 (RIGHT)
     bne vbl_kb_left
-    lda SPR_X_LO
-    clc
-    adc #1
+    lda SPR_X_LO        ; If it's set, perform a
+    clc                 ; 16-bit addition of 1
+    adc #1              ; and mask it down to 0-511
     sta SPR_X_LO
     lda SPR_X_HI
     adc #0
@@ -276,11 +279,11 @@ vbl_kb_right:
 
 vbl_kb_left:
     txa
-    and #8
+    and #4              ; Check bit 2 (LEFT)
     bne vbl_kb_end
-    lda SPR_X_LO
-    clc
-    sbc #1
+    lda SPR_X_LO        ; If it's set, perform a
+    clc                 ; 16-bit subtraction of 1
+    sbc #1              ; and mask it down to 0-511
     sta SPR_X_LO
     lda SPR_X_HI
     sbc #0
@@ -288,18 +291,34 @@ vbl_kb_left:
     sta SPR_X_HI
 
 vbl_kb_end:
-    lda SPR_X_LO
-    sta $d000
-    lda SPR_X_HI
-    sta $d010
+    lda SPR_X_LO        ; Positions have been determined,
+    sta $d000           ; set them
+    lda SPR_X_HI        ; We don't worry about the X-pos
+    sta $d010           ; of any other sprites
     ldx SPR_Y
     stx $d001
 
-vbl_end:
-    pla
-    tay
+    ;--- Per-frame events: Check if sprite is enabled ---------------------
+vbl_spr:
+    lda GAMEFLAGS
+    tax
+    and #4              ; Bit 2 of GAMEFLAGS
+    beq vbl_sprdbl      ; is "sprite on"
+    lda #1
+    sta $d015
+vbl_sprdbl:
+    txa
+    and #8              ; Bit 3 of GAMEFLAGS
+    beq raster_end      ; is "sprite doubled"
+    lda #1
+    sta $d017
+    sta $d01d
+
+    ;--- End of handler: we skipped to here for mid-frame rasters ---------
+raster_end:
     pla
     tax
+raster_endx:
     pla
     rti
 

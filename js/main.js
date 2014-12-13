@@ -119,7 +119,7 @@ require([
             price: 157248
         },{
             name: 'Raster-bars',
-            description: "LOADING... (random border color every 8 lines)",
+            description: "LOADING... (random border color every 12 lines)",
             effect_main: 'rasterbars',
             displayAt: 80000,
             price: 157248
@@ -142,11 +142,23 @@ require([
             displayAt: 2097152,
             price: 3144960
         },{
+            name: 'A sprite',
+            description: "It might be a ball, I guess? (+1 sprite)",
+            effect_main: 'sprite',
+            displayAt: 2097152,
+            price: 4194304
+        },{
             name: 'Foam finger',
             description: "It's a bit... big, isn't it? (+8 lines per click)",
             power: 4032,
             displayAt: 2097152,
             price: 8388608
+        },{
+            name: 'Double-size sprites',
+            description: "In both directions, even! (X- and Y- doubling of sprites)",
+            effect_main: 'doublesprite',
+            displayAt: 10485760,
+            price: 16777216
         },{
             name: 'Foam hand',
             description: "All the fingers, at once. (+40 lines per click)",
@@ -168,7 +180,9 @@ require([
         effects: {
             rasterbars: false,
             scrollshake: false,
-            quarterscreen: false
+            quarterscreen: false,
+            sprite: false,
+            doublesprite: false
         },
         thread: null,
 
@@ -441,10 +455,10 @@ require([
             }.bind(this)).powerTip();
         },
         effectHandlers: {
-            rasterbars: function(disable) {
-            },
-            scrollshake: function(disable) {
-            },
+            rasterbars: function(disable) {},
+            scrollshake: function(disable) {},
+            sprite: function(disable) {},
+            doublesprite: function(disable) {},
             quarterscreen: function(disable) {
                 if (disable) {
                     $('body').removeClass('quarterscreen');

@@ -16,8 +16,10 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0x0000:
                     if (addr == 0x0002) {
                         return (
-                            (this.owner.game.effects.rasterbars ? 1 : 0) +
-                            (this.owner.game.effects.scrollshake ? 2 : 0)
+                            (this.owner.game.effects.rasterbars   ? 1 : 0) +
+                            (this.owner.game.effects.scrollshake  ? 2 : 0) +
+                            (this.owner.game.effects.sprite       ? 4 : 0) +
+                            (this.owner.game.effects.doublesprite ? 8 : 0)
                         );
                     } else {
                         return this.ram[addr];

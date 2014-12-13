@@ -2,8 +2,8 @@ define(function() {
     return {
         JOY_UP: 1,
         JOY_DOWN: 2,
-        JOY_RIGHT: 4,
-        JOY_LEFT: 8,
+        JOY_LEFT: 4,
+        JOY_RIGHT: 8,
         JOY_FIRE: 16,
 
         currJoyPort: null,
