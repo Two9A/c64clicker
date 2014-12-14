@@ -40,6 +40,7 @@ body {
 }
 
 .content {
+    clear: both;
     margin: 0 auto;
     width: 840px;
 }
@@ -72,6 +73,76 @@ body {
     width: 320px;
 }
 
+.topbar {
+    width: 840px;
+    margin: 0 auto;
+}
+
+.joystick {
+    float: right;
+    width: 100px;
+    height: 100px;
+    position: relative;
+    margin-top: 10px;
+}
+.joystick.hidden {
+    display: none;
+}
+
+.joystick .active {
+    background: #c8ad7f;
+    color: black;
+    font-weight: bold;
+}
+
+#joy_left, #joy_right {
+    position: absolute;
+    top: 35px;
+    height: 20px;
+    padding: 5px;
+    line-height: 20px;
+    border: 2px solid #c8ad7f;
+    border-radius: 5px 5px 5px 5px;
+}
+
+#joy_left {
+    left: 0;
+    width: 55px;
+    border-right: 0;
+}
+#joy_right {
+    right: 0;
+    width: 53px;
+    text-align: right;
+    border-left: 0;
+}
+
+#joy_up, #joy_down {
+    position: absolute;
+    left: 35px;
+    width: 20px;
+    padding: 5px;
+    text-align: center;
+    border: 2px solid #c8ad7f;
+    border-radius: 5px 5px 5px 5px;
+}
+
+#joy_up {
+    top: 0;
+    border-bottom: 0;
+    height: 55px;
+}
+#joy_down {
+    bottom: 0;
+    height: 53px;
+    line-height: 90px;
+    border-top: 0;
+}
+
+#joy_fire {
+    display: none;
+}
+
 #bank {
     text-align: center;
     font-size: 30px;
@@ -89,9 +160,12 @@ body {
     width: 250px;
     background: #5d594f;
     border-radius: 13px 13px 13px 13px;
-    margin: 10px auto;
+    margin: 10px 360px 10px 230px;
     padding: 12px;
     cursor: pointer;
+}
+.joystick.hidden ~ #click {
+    margin: 10px auto;
 }
 
 #reset {

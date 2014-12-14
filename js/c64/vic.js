@@ -478,7 +478,7 @@ define(function() {
             for (i = 0; i < 8; i++) {
                 if (this.SPR[i].on) {
                     k = this.SPR[i].double_y ? 42 : 21;
-                    for (j = this.SPR[i].y; j < (this.SPR[i].y + k); j++) {
+                    for (j = this.SPR[i].y; j < (this.SPR[i].y + k) && j < this.sizes.RASTER_COUNT; j++) {
                         this.spriteRasters[j].push(i);
                     }
                 }

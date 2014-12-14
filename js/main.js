@@ -172,6 +172,11 @@ require([
             code: 'low_fps',
             description: "If your computer's burning up, drop the rendering to 1 frame per second.",
             set: false
+        },{
+            name: 'Hide joystick',
+            code: 'joystick_hidden',
+            description: "For reference, the joystick is plugged into port 2.",
+            set: false
         }],
 
         frontCanvas: null,
@@ -482,6 +487,9 @@ require([
                 }
                 clearInterval(this.intervals.step);
                 this.intervals.step = setInterval(this.stepDraw.bind(this), 1000 / this.FPS);
+            },
+            joystick_hidden: function(disable) {
+                $('.joystick')[disable ? 'removeClass' : 'addClass']('hidden');
             }
         },
         init: function() {

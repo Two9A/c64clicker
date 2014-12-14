@@ -82,18 +82,23 @@ define(function() {
             keydown: function(e) {
                 switch (e.keyCode) {
                     case 37:
+                        $('#joy_left').addClass('active');
                         this.currJoyState &= (255 - this.JOY_LEFT);
                         break;
                     case 38:
+                        $('#joy_up').addClass('active');
                         this.currJoyState &= (255 - this.JOY_UP);
                         break;
                     case 39:
+                        $('#joy_right').addClass('active');
                         this.currJoyState &= (255 - this.JOY_RIGHT);
                         break;
                     case 40:
+                        $('#joy_down').addClass('active');
                         this.currJoyState &= (255 - this.JOY_DOWN);
                         break;
                     case 32:
+                        $('#joy_fire').addClass('active');
                         this.currJoyState &= (255 - this.JOY_FIRE);
                         break;
                 }
@@ -101,18 +106,23 @@ define(function() {
             keyup: function(e) {
                 switch (e.keyCode) {
                     case 37:
+                        $('#joy_left').removeClass('active');
                         this.currJoyState |= this.JOY_LEFT;
                         break;
                     case 38:
+                        $('#joy_up').removeClass('active');
                         this.currJoyState |= this.JOY_UP;
                         break;
                     case 39:
+                        $('#joy_right').removeClass('active');
                         this.currJoyState |= this.JOY_RIGHT;
                         break;
                     case 40:
+                        $('#joy_down').removeClass('active');
                         this.currJoyState |= this.JOY_DOWN;
                         break;
                     case 32:
+                        $('#joy_fire').removeClass('active');
                         this.currJoyState |= this.JOY_FIRE;
                         break;
                 }
