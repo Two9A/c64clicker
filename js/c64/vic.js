@@ -418,6 +418,7 @@ define(function() {
 
                 if (step == 8) {
                     step = 0;
+                    this.owner.CIA.step();
                     this.owner.CPU.step();
                 }
             } while (i < pixels);

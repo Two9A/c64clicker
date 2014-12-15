@@ -6,6 +6,10 @@ define(function() {
         JOY_RIGHT: 8,
         JOY_FIRE: 16,
 
+        timers: [],
+        CNTPIN: null,
+        CNTPIN_prev: null,
+
         currJoyPort: null,
         currJoyState: null,
 
@@ -144,6 +148,58 @@ define(function() {
             this.registers[0][this.currJoyPort] &= 0xE0;
             this.registers[0][this.currJoyPort] |= this.currJoyState;
         },
+        step: function() {
+            this.CNTPIN_prev = this.CNTPIN;
+
+            var i, j, timer, dec;
+            for (i = 0; i < 2; i++) {
+                for (j = 0; j < 2; j++) {
+                    timer = this.timers[i][j];
+                    if (timer.running) {
+                        if (timer.value == 0) {
+                            timer.underflowed = true;
+                            if (timer.oneshot) {
+                                timer.running = false;
+                            } else {
+                                timer.value = timer.latchroll ? timer.latch : 65535;
+                            }
+                        } else {
+                            timer.underflowed = false;
+                            switch (j * 4 + timer.mode) {
+                                // Timer A: clock
+                                case 0:
+                                    dec = true;
+                                    break;
+                                // Timer A: positive slope on CNT
+                                case 1:
+                                    dec = this.CNTPIN && !this.CNTPIN_prev;
+                                    break;
+
+                                // Timer B: clock
+                                case 4:
+                                    dec = true;
+                                    break;
+                                // Timer B: positive slope on CNT
+                                case 5:
+                                    dec = this.CNTPIN && !this.CNTPIN_prev;
+                                    break;
+                                // Timer B: A underflow
+                                case 6:
+                                    dec = this.timers[i][0].underflowed;
+                                    break;
+                                // Timer B: A underflow and +ve slope on CNT
+                                case 7:
+                                    dec = this.timers[i][0].underflowed && this.CNTPIN && !this.CNTPIN_prev;
+                                    break;
+                            }
+                            if (dec) {
+                                timer.value--;
+                            }
+                        }
+                    }
+                }
+            }
+        },
         reset: function() {
             // All pins are pulled high on the data ports
             this.registers[0][0] = 255;
@@ -153,6 +209,25 @@ define(function() {
 
             this.currJoyPort = 0;
             this.currJoyState = 31;
+            this.CNTPIN = false;
+            this.CNTPIN_prev = false;
+
+            var i, j;
+            this.timers.length = 0;
+            for (i = 0; i < 2; i++) {
+                this.timers[i] = [];
+                for (j = 0; j < 2; j++) {
+                    this.timers[i][j] = {
+                        mode: 0,
+                        running: false,
+                        underflowed: false,
+                        oneshot: false,
+                        latchroll: false,
+                        latch: 0,
+                        value: 0
+                    };
+                }
+            }
         },
         init: function() {
             this.reset();
