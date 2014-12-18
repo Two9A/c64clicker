@@ -3,6 +3,14 @@ requirejs.config({
     packages: ['c64'],
     paths: {
         jquery: '//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min'
+    },
+    shim: {
+        'thirdparty/jquery.powertip.min': {
+            deps: ['jquery']
+        },
+        'thirdparty/jquery.nodoubletapzoom': {
+            deps: ['jquery']
+        }
     }
 });
 require([
