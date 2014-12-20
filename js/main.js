@@ -27,6 +27,7 @@ require([
         debug: false,
 
         bank: null,
+        prevBank: null,
         produced: null,
         spent: null,
         maxPrice: null,
@@ -272,7 +273,7 @@ require([
             this.step_prev = now;
         },
         stepDraw: function() {
-            var bank, thisFrame, frames, cps_amt;
+            var bank, thisFrame, frames, cps_amt, i, j;
 
             this.cps_step++;
             cps_amt = (0.0 + this.cps_step) * this.cps_div;
@@ -295,6 +296,13 @@ require([
                     this.maxPrice.divide(VIC.sizes.FRAME_SIZE).toJSValue()
                 );
             }
+
+            if (this.prevBank && bank.compare(this.prevBank) === 0) {
+                // State has changed not one iota, give up
+                return;
+            }
+
+            this.prevBank = BigInteger(bank);
 
             // We're running a system here, and it may change state mid-frame,
             // so we have to run it from the start of frame to render it
@@ -348,13 +356,18 @@ require([
                 }
             }
 
+            i = thisFrame.divide(VIC.sizes.RASTER_LENGTH).toJSValue();
+            j = thisFrame.subtract(i * VIC.sizes.RASTER_LENGTH).toJSValue();
+
             $('#bank').text(this.pluralize(bank.toString(), 'pixel'));
             $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
             $('#clock').text(this.pluralize(this.cps.divide(8).toString(), 'Hz', false));
             $('#cps').text(this.pluralize(this.cps.toString(), 'pixel') + '/s');
             $('#curframe').text(frames.add(1).toString());
-            $('#curraster').text(thisFrame.divide(VIC.sizes.RASTER_LENGTH));
+            $('#curraster').text(i);
             $('#curperiod').text(VIC.endpointStrings[renderEndpoint]);
+            $('.cursor_x').css('left', j + 6);
+            $('.cursor_y').css('top', i + 42);
             this.frontContext.drawImage(VIC.backCanvas, 0, 0);
         },
         showTab: function(rel) {

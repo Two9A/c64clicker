@@ -48,6 +48,7 @@ body {
 .screen {
     width: 504px;
     padding-top: 36px;
+    position: relative;
 }
 
 #screen {
@@ -66,6 +67,24 @@ body {
 
 .status span {
     font-weight: bold;
+}
+
+.cursor_x {
+    height: 8px;
+    width: 1px;
+    position: absolute;
+    top: 28px;
+    left: 6px;
+    background: #c8ad7f;
+}
+
+.cursor_y {
+    width: 8px;
+    height: 1px;
+    position: absolute;
+    top: 42px;
+    left: -8px;
+    background: #c8ad7f;
 }
 
 .sidebar {
