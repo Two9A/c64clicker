@@ -315,7 +315,7 @@ require([
             var $item;
             for (i in this.units) {
                 $item = $('li#unit' + i);
-                if (bank.compare(this.units[i].displayAt) >= 0) {
+                if (this.units[i].count || bank.compare(this.units[i].displayAt) >= 0) {
                     $item.addClass('active');
                 } else {
                     $item.removeClass('active');

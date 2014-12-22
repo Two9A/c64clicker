@@ -381,7 +381,7 @@ define(function() {
                         break;
                 }
                 
-                pixel = this.colors[pixel];
+                pixel = this.colors[0 | pixel];
                 imageData.data[pos++] = pixel[0];
                 imageData.data[pos++] = pixel[1];
                 imageData.data[pos++] = pixel[2];
