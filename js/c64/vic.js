@@ -27,25 +27,36 @@ define(function() {
         BG1:        null,
         BG2:        null,
         BG3:        null,
+        RASTER:     null,
         RASTERHIT:  null,
 
         stateVars: [
             'SCREENPTR', 'CHARPTR', 'IRM', 'RSEL', 'CSEL',
             'DISPLAY', 'HIRES', 'EXTCOLOR', 'MULTICOLOR',
             'XSCROLL', 'YSCROLL', 'BORDER', 'BG0', 'BG1',
-            'BG2', 'BG3', 'RASTERHIT'
+            'BG2', 'BG3', 'RASTER', 'RASTERHIT'
         ],
 
         SPR:        null,
 
         r: function(addr) {
-            addr += (this.owner.MMU.vicBank * 16384);
-            switch (addr & 0xF000) {
-                case 0x1000:
-                case 0x9000:
-                    return this.owner.MMU.charRom[addr & 0x0FFF];
-                default:
-                    return this.owner.MMU.ram[addr];
+            switch (this.owner.MMU.vicBank) {
+                case 0:
+                    if (addr >= 0x1000 && addr < 0x2000) {
+                        return this.owner.MMU.charRom[addr & 0x0FFF];
+                    } else {
+                        return this.owner.MMU.ram[addr & 0x3FFF];
+                    }
+                case 1:
+                    return this.owner.MMU.ram[addr & 0x3FFF];
+                case 2:
+                    if (addr >= 0x9000 && addr < 0xA000) {
+                        return this.owner.MMU.charRom[addr & 0x0FFF];
+                    } else {
+                        return this.owner.MMU.ram[addr & 0x3FFF];
+                    }
+                case 3:
+                    return this.owner.MMU.ram[addr & 0x3FFF];
             }
         },
         w: function(addr, val) {
@@ -53,6 +64,16 @@ define(function() {
         },
         io_r: function(addr) {
             addr &= 63;
+            switch (addr) {
+                case 17: // FLAGS1
+                    this.registers[addr] = (this.RASTER & 256) ?
+                        (this.registers[addr] | 128) :
+                        (this.registers[addr] & 127);
+                    break;
+                case 18: // RASTER
+                    this.registers[addr] = this.RASTER & 255;
+                    break;
+            }
             return (this.registers[addr] !== undefined) ? this.registers[addr] : 0;
         },
         io_w: function(addr, val) {
@@ -212,8 +233,8 @@ define(function() {
         },
         renderFrame: function(pixels) {
             var i = 0, j, k, p;
-            var x = 0, y = 0, step = 0, pos = 0, mode = 0, row = 0, loc = 0;
-            var sx, cx, cy, px, py,
+            var x = 0, y = 0, pos = 0, mode = 0, row = 0, loc = 0;
+            var sx, cx, cy, px, py, pixel,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
                 right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBL,
@@ -223,6 +244,7 @@ define(function() {
                 charBase = this.CHARPTR * 2048;
 
             var imageData = this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
+            this.RASTER = 0;
 
             // Bit of a hack...
             for (j = 0; j < 40; j++) {
@@ -262,7 +284,7 @@ define(function() {
                 // Starts at HBL on the previous line
                 if (y < 255) {
                     if (x > right_hbl) {
-                        for (j in this.spriteRasters[y + 1]) {
+                        for (j = 0; j < this.spriteRasters[y + 1].length; j++) {
                             this.owner.MMU.busLock += 2;
                             k = this.spriteRasters[y + 1][j];
                             p = this.r(locBase + 1016 + k);
@@ -282,59 +304,39 @@ define(function() {
                 // BUGBUG: This obviously doesn't allow for hyperscreen
                 if (!this.rasterModes[y]) {
                     // Display hasn't been set up yet
-                    imageData.data[pos++] = 0x40;
-                    imageData.data[pos++] = 0x40;
-                    imageData.data[pos++] = 0x40;
-                    imageData.data[pos++] = 0xFF;
+                    pixel = 11;
                 }
                 else switch (this.rasterModes[y]) {
                     // VBlank
                     case 1:
                         mode = 1;
-                        j = ((y&4) ^ (x&4)) ? 0x99 : 0x66;
-                        imageData.data[pos++] = j;
-                        imageData.data[pos++] = j;
-                        imageData.data[pos++] = j;
-                        imageData.data[pos++] = 0xFF;
+                        pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         break;
 
                     // HBlank/border
                     case 2:
                         if (x < 50 || x >= right_hbl) {
                             mode = 2;
-                            j = ((y&4) ^ (x&4)) ? 0x99 : 0x66;
-                            imageData.data[pos++] = j;
-                            imageData.data[pos++] = j;
-                            imageData.data[pos++] = j;
+                            pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         } else {
                             mode = 3;
-                            imageData.data[pos++] = this.colors[this.BORDER][0];
-                            imageData.data[pos++] = this.colors[this.BORDER][1];
-                            imageData.data[pos++] = this.colors[this.BORDER][2];
+                            pixel = this.BORDER;
                         }
-                        imageData.data[pos++] = 0xFF;
                         break;
 
                     // HBlank/border/screen data
                     case 3:
                         if (x < left_hbl || x >= right_hbl) {
                             mode = 2;
-                            j = ((y&4) ^ (x&4)) ? 0x99 : 0x66;
-                            imageData.data[pos++] = j;
-                            imageData.data[pos++] = j;
-                            imageData.data[pos++] = j;
+                            pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         } else if (x < left_border || x >= right_border || !this.DISPLAY) {
                             mode = 3;
-                            imageData.data[pos++] = this.colors[this.BORDER][0];
-                            imageData.data[pos++] = this.colors[this.BORDER][1];
-                            imageData.data[pos++] = this.colors[this.BORDER][2];
+                            pixel = this.BORDER;
                         } else {
                             mode = 4;
 
                             // Background
-                            imageData.data[pos+0] = this.colors[this.BG0][0];
-                            imageData.data[pos+1] = this.colors[this.BG0][1];
-                            imageData.data[pos+2] = this.colors[this.BG0][2];
+                            pixel = this.BG0;
 
                             // Sprites wot live below the text
                             for (j = 7; j >= 0; j--) {
@@ -350,9 +352,7 @@ define(function() {
                                             p >>= 1;
                                         }
                                         if (this.curLineSpr[j * 3 + (p >> 3)] & this.bitPositions[p & 7]) {
-                                            imageData.data[pos+0] = this.colors[this.SPR[j].col][0];
-                                            imageData.data[pos+1] = this.colors[this.SPR[j].col][1];
-                                            imageData.data[pos+2] = this.colors[this.SPR[j].col][2];
+                                            pixel = this.SPR[j].col;
                                         }
                                     }
                                 }
@@ -364,10 +364,7 @@ define(function() {
                               (y >= top_border && y < bottom_border) &&
                               (j & this.bitPositions[cx])
                             ) {
-                                j = this.curLineCol[sx >> 3];
-                                imageData.data[pos+0] = this.colors[j][0];
-                                imageData.data[pos+1] = this.colors[j][1];
-                                imageData.data[pos+2] = this.colors[j][2];
+                                pixel = this.curLineCol[sx >> 3];
                             }
 
                             // Sprites above the text
@@ -384,31 +381,26 @@ define(function() {
                                             p >>= 1;
                                         }
                                         if (this.curLineSpr[j * 3 + (p >> 3)] & this.bitPositions[p & 7]) {
-                                            imageData.data[pos+0] = this.colors[this.SPR[j].col][0];
-                                            imageData.data[pos+1] = this.colors[this.SPR[j].col][1];
-                                            imageData.data[pos+2] = this.colors[this.SPR[j].col][2];
+                                            pixel = this.SPR[j].col;
                                         }
                                     }
                                 }
                             }
-
-                            pos += 3;
                         }
-
-                        imageData.data[pos++] = 0xFF;
                         break;
                 }
                 
-                x++; i++; step++;
+                pixel = this.colors[pixel];
+                imageData.data[pos++] = pixel[0];
+                imageData.data[pos++] = pixel[1];
+                imageData.data[pos++] = pixel[2];
+                imageData.data[pos++] = 0xFF;
+
+                x++; i++;
                 if (x == this.sizes.RASTER_LENGTH) {
                     x = 0;
                     y++;
-
-                    // Update the raster register in 'hardware'
-                    this.registers[this.rg.RASTER] = y & 255;
-                    this.registers[this.rg.FLAGS0] = (y & 256) ?
-                        (this.registers[this.rg.FLAGS0] | 128) :
-                        (this.registers[this.rg.FLAGS0] & 127);
+                    this.RASTER++;
 
                     if ((this.IRM & 1) && this.RASTERHIT == y) {
                         this.registers[this.rg.IRQ] |= 0x81;
@@ -416,8 +408,7 @@ define(function() {
                     }
                 }
 
-                if (step == 8) {
-                    step = 0;
+                if (!(i&7)) {
                     this.owner.CIA.step();
                     this.owner.CPU.step();
                 }
