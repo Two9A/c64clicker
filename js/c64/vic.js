@@ -233,7 +233,7 @@ define(function() {
         },
         renderFrame: function(pixels) {
             var i = 0, j, k, p;
-            var x = 0, y = 0, pos = 0, mode = 0, row = 0, loc = 0;
+            var x = 0, y = 0, pos = 0, row = 0, loc = 0;
             var sx, cx, cy, px, py, pixel,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
@@ -284,11 +284,12 @@ define(function() {
                 // Starts at HBL on the previous line
                 if (y < 255) {
                     if (x > right_hbl) {
-                        for (j = 0; j < this.spriteRasters[y + 1].length; j++) {
+                        y++;
+                        for (j = 0; j < this.spriteRasters[y].length; j++) {
                             this.owner.MMU.busLock += 2;
-                            k = this.spriteRasters[y + 1][j];
+                            k = this.spriteRasters[y][j];
                             p = this.r(locBase + 1016 + k);
-                            py = y + 1 - this.SPR[k].y;
+                            py = y - this.SPR[k].y;
                             if (this.SPR[k].double_y) {
                                 py >>= 1;
                             }
@@ -298,28 +299,22 @@ define(function() {
                             this.curLineSpr[k * 3 + 1] = this.r(py + 1);
                             this.curLineSpr[k * 3 + 2] = this.r(py + 2);
                         }
+                        y--;
                     }
                 }
 
                 // BUGBUG: This obviously doesn't allow for hyperscreen
-                if (!this.rasterModes[y]) {
-                    // Display hasn't been set up yet
-                    pixel = 11;
-                }
-                else switch (this.rasterModes[y]) {
+                switch (this.rasterModes[y]) {
                     // VBlank
                     case 1:
-                        mode = 1;
                         pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         break;
 
                     // HBlank/border
                     case 2:
                         if (x < 50 || x >= right_hbl) {
-                            mode = 2;
                             pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         } else {
-                            mode = 3;
                             pixel = this.BORDER;
                         }
                         break;
@@ -327,14 +322,10 @@ define(function() {
                     // HBlank/border/screen data
                     case 3:
                         if (x < left_hbl || x >= right_hbl) {
-                            mode = 2;
                             pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         } else if (x < left_border || x >= right_border || !this.DISPLAY) {
-                            mode = 3;
                             pixel = this.BORDER;
                         } else {
-                            mode = 4;
-
                             // Background
                             pixel = this.BG0;
 
@@ -415,7 +406,22 @@ define(function() {
             } while (i < pixels);
 
             this.backContext.putImageData(imageData, 0, 0);
-            return mode;
+
+            // Determine which mode we ended up at
+            switch (this.rasterModes[y]) {
+                case 1:
+                    return 1;
+                case 2:
+                    return (x < 50 || x >= right_hbl) ? 2 : 3;
+                case 3:
+                    return (x < left_hbl || x >= right_hbl) ?
+                        2 :
+                        (x < left_border || x >= right_border || !this.DISPLAY) ?
+                            3 :
+                            4 ;
+            }
+
+            return 0;
         },
         getState: function() {
             var i, ret = {
@@ -495,6 +501,7 @@ define(function() {
             for (i = 0; i < this.sizes.RASTER_COUNT; i++) {
                 this.spriteRasters[i] = [];
             }
+            this.fillRasterModes();
             
             this.renderedFrames = {};
             this.backContext.fillStyle = 'black';
