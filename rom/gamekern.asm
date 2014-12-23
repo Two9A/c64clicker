@@ -16,6 +16,7 @@ RASTER_LO = $17
 RASTER_HI = $18
 RASTERBAR = $19
 SCROLLPOS = $1A
+BGCOL     = $1B
 
 TMP0      = $30
 TMP1      = $31
@@ -49,12 +50,20 @@ reset:
     lda #0
     sta RASTERBAR       ; Start off with no rasterbars
 
-    ;--- CIA interrupt disabling ------------------------------------------
+    ;--- CIA interrupt setup ----------------------------------------------
+    lda #$7e
+    sta $dc0d           ; Enable timer A interrupt on CIA1
     lda #$7f
-    sta $dc0d
-    sta $dd0d           ; Disable interrupts on both CIAs
+    sta $dd0d           ; Disable interrupts on CIA2
     lda $dc0d
     lda $dd0d           ; Acknowledge interrupts on both CIAs
+
+    lda #$ff
+    sta $dc04
+    lda #$ff
+    sta $dc05           ; Latch timer A at 65535 (3.334 frames)
+    lda #$01
+    sta $dc0e           ; Start timer A (latchroll, multishot)
 
     cli                 ; Turn interrupts back on
 
@@ -168,6 +177,10 @@ handler_raster:
     pha
     dec $d019           ; Acknowledge
 
+    ;--- Check if this was the CIA interrupting ---------------------------
+    lda $dc0d
+    bne handler_cia
+
     ;--- Change the border color ------------------------------------------
 raster_bars:
     lda $d020
@@ -205,6 +218,19 @@ raster_inc:
 raster_notop:
     pla
     rti                 ; Leaving the handler early!
+
+    ;--- CIA handler (within relative-jump range of the top of handler) ---
+handler_cia:
+    lda GAMEFLAGS
+    and #16             ; Bit 4 of GAMEFLAGS
+    beq cia_end         ; is "background change on"
+    lda BGCOL
+    adc #3
+    sta BGCOL
+    sta $d021           ; Change the background color
+cia_end:
+    pla
+    rti                 ; Leaving the handler
 
     ;--- Per-frame events: scrollshake ------------------------------------
 vbl_frame:

@@ -10,6 +10,9 @@ define(function() {
         CNTPIN: null,
         CNTPIN_prev: null,
 
+        IRQ: null,
+        IRM: null,
+
         currJoyPort: null,
         currJoyState: null,
 
@@ -58,21 +61,42 @@ define(function() {
         io_r: function(addr) {
             var chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
-            switch (chip) {
-                case 0:
-                    switch (addr) {
-                        case 0:
-                        case 1:
-                            if (this.currJoyPort == addr) {
-                                this.registers[chip][addr] &= 0xE0;
-                                this.registers[chip][addr] |= this.currJoyState;
-                            }
-                            break;
+            switch (addr) {
+                case 0: // Port A
+                    if (chip) {
+                        // TODO: Keyboard read
+                    } else {
+                        if (this.currJoyPort == addr) {
+                            this.registers[chip][addr] &= 0xE0;
+                            this.registers[chip][addr] |= this.currJoyState;
+                        }
                     }
                     break;
-                case 1:
-                    switch (addr) {
+                case 1: // Port B
+                    if (chip) {
+                        // TODO: Keyboard read
+                    } else {
+                        if (this.currJoyPort == addr) {
+                            this.registers[chip][addr] &= 0xE0;
+                            this.registers[chip][addr] |= this.currJoyState;
+                        }
                     }
+                    break;
+                case 4: // Timer A lo
+                    this.registers[chip][addr] = this.timers[chip][0].value & 255;
+                    break;
+                case 5: // Timer A hi
+                    this.registers[chip][addr] = this.timers[chip][0].value >> 8;
+                    break;
+                case 7: // Timer B lo
+                    this.registers[chip][addr] = this.timers[chip][1].value & 255;
+                    break;
+                case 8: // Timer B hi
+                    this.registers[chip][addr] = this.timers[chip][1].value >> 8;
+                    break;
+                case 13: // IRQ
+                    this.registers[chip][addr] = this.IRQ[chip];
+                    this.IRQ[chip] = 0;
                     break;
             }
             return this.registers[chip][addr];
@@ -80,6 +104,50 @@ define(function() {
         io_w: function(addr, val) {
             var chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
+            val &= 255;
+
+            switch (addr) {
+                case 4: // Timer A lo latch
+                    this.timers[chip][0].latch &= 0xFF00;
+                    this.timers[chip][0].latch |= val;
+                    return;
+                case 5: // Timer A hi latch
+                    this.timers[chip][0].latch &= 0x00FF
+                    this.timers[chip][0].latch |= (val << 8);
+                    return;
+                case 6: // Timer B lo latch
+                    this.timers[chip][1].latch &= 0xFF00;
+                    this.timers[chip][1].latch |= val;
+                    return;
+                case 7: // Timer B hi latch
+                    this.timers[chip][1].latch &= 0x00FF
+                    this.timers[chip][1].latch |= (val << 8);
+                    return;
+                case 13: // IRM
+                    if (val & 31) {
+                        this.IRM[chip] = (val & 31) ^ ((val & 128) ? 0 : 31);
+                    }
+                    break;
+                case 14: // Timer A control
+                    this.timers[chip][0].running = !!(val & 1);
+                    this.timers[chip][0].oneshot = !!(val & 8);
+                    this.timers[chip][0].latchroll = !!(val & 16);
+                    this.timers[chip][0].mode = (val & 32) >> 5;
+                    if (!this.timers[chip][0].running) {
+                        this.timers[chip][0].latch &= 255;
+                    }
+                    break;
+                case 15: // Timer B control
+                    this.timers[chip][1].running = !!(val & 1);
+                    this.timers[chip][1].oneshot = !!(val & 8);
+                    this.timers[chip][1].latchroll = !!(val & 16);
+                    this.timers[chip][1].mode = (val & 96) >> 5;
+                    if (!this.timers[chip][1].running) {
+                        this.timers[chip][1].latch &= 255;
+                    }
+                    break;
+            }
+
             this.registers[chip][addr] = val & 255;
         },
         handlers: {
@@ -133,12 +201,27 @@ define(function() {
             }
         },
         getState: function() {
+            var t = [], i, j;
+            for (i = 0; i < 2; i++) {
+                t[i] = [];
+                for (j = 0; j < 2; j++) {
+                    t[i][j] = $.extend({}, this.timers[i][j])
+                }
+            }
             return {
                 CIA1: this.registers[0].slice(0),
-                CIA2: this.registers[1].slice(0)
+                CIA2: this.registers[1].slice(0),
+                timers: t
             }
         },
         setState: function(state) {
+            var t = [], i, j;
+            for (i = 0; i < 2; i++) {
+                t[i] = [];
+                for (j = 0; j < 2; j++) {
+                    t[i][j] = $.extend({}, state.timers[i][j])
+                }
+            }
             for (i in state.CIA1) {
                 this.io_w(i, state.CIA1[i]);
             }
@@ -147,6 +230,7 @@ define(function() {
             }
             this.registers[0][this.currJoyPort] &= 0xE0;
             this.registers[0][this.currJoyPort] |= this.currJoyState;
+            this.timers = t;
         },
         step: function() {
             this.CNTPIN_prev = this.CNTPIN;
@@ -162,6 +246,17 @@ define(function() {
                                 timer.running = false;
                             } else {
                                 timer.value = timer.latchroll ? timer.latch : 65535;
+                            }
+                            if (j) {
+                                if (this.IRM[i] & 2) {
+                                    this.IRQ[i] |= 0x82;
+                                    this.owner.CPU.signal('INT');
+                                }
+                            } else {
+                                if (this.IRM[i] & 1) {
+                                    this.IRQ[i] |= 0x81;
+                                    this.owner.CPU.signal('INT');
+                                }
                             }
                         } else {
                             timer.underflowed = false;
@@ -211,6 +306,8 @@ define(function() {
             this.currJoyState = 31;
             this.CNTPIN = false;
             this.CNTPIN_prev = false;
+            this.IRQ = [0,0];
+            this.IRM = [0,0];
 
             var i, j;
             this.timers.length = 0;
