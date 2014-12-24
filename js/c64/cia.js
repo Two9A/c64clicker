@@ -226,7 +226,7 @@ define(function() {
                 this.io_w(i, state.CIA1[i]);
             }
             for (i in state.CIA2) {
-                this.io_w(0x0100 + i, state.CIA2[i]);
+                this.io_w(0x0100 | i, state.CIA2[i]);
             }
             this.registers[0][this.currJoyPort] &= 0xE0;
             this.registers[0][this.currJoyPort] |= this.currJoyState;

@@ -14,16 +14,6 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
         r: function(addr) {
             switch (addr & 0xF000) {
                 case 0x0000:
-                    if (addr == 0x0002) {
-                        return (
-                            (this.owner.game.effects.rasterbars   ? 1 : 0) +
-                            (this.owner.game.effects.scrollshake  ? 2 : 0) +
-                            (this.owner.game.effects.sprite       ? 4 : 0) +
-                            (this.owner.game.effects.doublesprite ? 8 : 0)
-                        );
-                    } else {
-                        return this.ram[addr];
-                    }
                 case 0x1000:
                 case 0x2000:
                 case 0x3000:
@@ -79,7 +69,18 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 case 0xC00:
                 case 0xD00:
                     return this.owner.CIA.io_r(addr);
+                case 0xE00:
+                    if ((addr & 0x00FF) == 0) {
+                        return (
+                            (this.owner.game.effects.rasterbars   ? 1 : 0) +
+                            (this.owner.game.effects.scrollshake  ? 2 : 0) +
+                            (this.owner.game.effects.sprite       ? 4 : 0) +
+                            (this.owner.game.effects.doublesprite ? 8 : 0)
+                        );
+                    }
+                    break;
             }
+            return 0;
         },
         io_w: function(addr, val) {
             switch (addr & 0xF00) {
@@ -120,6 +121,10 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                 switch (addr) {
                     case 'KERNAL':
                         dest = 'romKernal';
+                        addr = 0;
+                        break;
+                    case 'BASIC':
+                        dest = 'romBasic';
                         addr = 0;
                         break;
                     default:

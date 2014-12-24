@@ -300,11 +300,12 @@ define(function() {
                 switch (this.reg.tmp4) {
                     case null:
                         this.reg.tmp4 = 1;
-                        this.util.push.call(this, this.reg.PC >> 8);
+                        this.reg.tmp3 = (this.reg.PC - 1) & 0xFFFF;
+                        this.util.push.call(this, this.reg.tmp3 >> 8);
                         return false;
                     case 1:
                         this.reg.tmp4 = 2;
-                        this.util.push.call(this, this.reg.PC & 255);
+                        this.util.push.call(this, this.reg.tmp3 & 255);
                         return false;
                     case 2:
                         this.reg.PC = this.reg.addr;
@@ -477,21 +478,21 @@ define(function() {
                 return true;
             },
             SBC: function() {
-                var res = this.reg.A - this.reg.operand - ((this.reg.P & this.flags.C) ? 1 : 0);
+                var res = this.reg.A - this.reg.operand - ((this.reg.P & this.flags.C) ? 0 : 1);
                 this.util.setNZ.call(this, res & 255);
                 this.util.setFlag.call(this, this.flags.V,
                     ((this.reg.A ^ this.reg.operand) & 128) &&
                     ((this.reg.A ^ res) && 128)
                 );
                 if (this.reg.P & this.flags.D) {
-                    if ((this.reg.A & 15) - ((this.reg.P & this.flags.C) ? 1 : 0) < (this.reg.operand & 15)) {
+                    if ((this.reg.A & 15) - ((this.reg.P & this.flags.C) ? 0 : 1) < (this.reg.operand & 15)) {
                         res -= 6;
                     }
                     if (res > 0x99) {
                         res -= 0x60;
                     }
                 }
-                this.util.setFlag.call(this, this.flags.C, res < 256);
+                this.util.setFlag.call(this, this.flags.C, !(res & 256));
                 this.reg.A = res & 255;
                 return true;
             },

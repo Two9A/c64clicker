@@ -52,5 +52,11 @@ define([
             C64[i].setState(C64.savedFrames[frame][i]);
         }
     };
+
+    C64.resetToBasic = function() {
+        C64.MMU.load('/rom/kernal.rom', 'KERNAL');
+        C64.MMU.load('/rom/basic.rom', 'BASIC');
+    };
+
     return C64;
 });

@@ -5,7 +5,7 @@
 
 .code
 
-GAMEFLAGS = $02
+GAMEFLAGS = $DE00
 SPR_X_LO  = $10
 SPR_X_HI  = $11
 SPR_Y     = $12
