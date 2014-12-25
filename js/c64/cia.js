@@ -58,27 +58,120 @@ define(function() {
             ]
         ],
 
+        keysPressed: null,
+        keymap: {
+            27: 63,     // Esc: Run/Stop
+            112: 4,     // F1: F1
+            113: 5,     // F2: F3
+            114: 6,     // F3: F5
+            115: 3,     // F4: F7
+            116: 54,    // F5: Arrow Up
+            117: 48,    // F6: Pound
+            118: 51,    // F7: Home
+            119: 'NMI', // F8: Restore
+
+            192: 57,    // `: Arrow Left
+            49: 56,     // 1: 1
+            50: 59,     // 2: 2
+            51: 8,      // 3: 3
+            52: 11,     // 4: 4
+            53: 16,     // 5: 5
+            54: 19,     // 6: 6
+            55: 24,     // 7: 7
+            56: 27,     // 8: 8
+            57: 32,     // 9: 9
+            48: 35,     // 0: 0
+            189: 40,    // -: +
+            187: 43,    // =: -
+            8: 0,       // Bksp: Del
+
+            9: 58,      // Tab: Control
+            81: 62,     // Q: Q
+            87: 9,      // W: W
+            69: 14,     // E: E
+            82: 17,     // R: R
+            84: 22,     // T: T
+            89: 25,     // Y: Y
+            85: 30,     // U: U
+            73: 33,     // I: I
+            79: 38,     // O: O
+            80: 41,     // P: P
+            219: 46,    // [: @
+            221: 49,    // ]: *
+            220: 53,    // \: =
+
+            65: 10,     // A: A
+            83: 13,     // S: S
+            68: 18,     // D: D
+            70: 21,     // F: F
+            71: 26,     // G: G
+            72: 29,     // H: H
+            74: 34,     // J: J
+            75: 37,     // K: K
+            76: 42,     // L: L
+            186: 45,    // ;: :
+            222: 50,    // ': ;
+            13: 1,      // Enter: Return
+
+            16: 15,     // Shift: Left Shift
+            90: 12,     // Z: Z
+            88: 23,     // X: X
+            67: 20,     // C: C
+            86: 31,     // V: V
+            66: 28,     // B: B
+            78: 39,     // N: N
+            77: 36,     // M: M
+            188: 47,    // ,: ,
+            190: 44,    // .: .
+            191: 55,    // /: /
+
+            17: 61,     // Ctrl: C=
+            91: 7,      // Left Win: Cursor Down
+            32: 60,     // Space: Space
+            93: 2,      // Right Win: Cursor Right
+            18: 'FIRE', // Alt: Joystick Fire
+            37: 'L',    // Left: Joystick Left
+            38: 'U',    // Up: Joystick Up
+            39: 'R',    // Right: Joystick Right
+            40: 'D'     // Down: Joystick Down
+        },
+
         io_r: function(addr) {
-            var chip = (addr & 0x0100) ? 1 : 0;
+            var i, j, chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
             switch (addr) {
                 case 0: // Port A
                     if (chip) {
-                        // TODO: Keyboard read
+                        // TODO: RS232/VIC banking
                     } else {
-                        if (this.currJoyPort == addr) {
-                            this.registers[chip][addr] &= 0xE0;
-                            this.registers[chip][addr] |= this.currJoyState;
+                        for (i = 7; i >= 0; i--) {
+                            j = 1 << i;
+                            if (this.currJoyPort == addr) {
+                                this.registers[0][addr] &= (255 - j);
+                                this.registers[0][addr] |= (this.currJoyState & j);
+                            }
                         }
                     }
                     break;
                 case 1: // Port B
                     if (chip) {
-                        // TODO: Keyboard read
+                        // TODO: RS232
                     } else {
-                        if (this.currJoyPort == addr) {
-                            this.registers[chip][addr] &= 0xE0;
-                            this.registers[chip][addr] |= this.currJoyState;
+                        this.registers[0][1] = 255;
+                        for (i = 0; i < this.keysPressed.length; i++) {
+                            j = this.keysPressed[i] >> 3;
+                            if (!(this.registers[0][0] & (1 << j))) {
+                                // Keyboard column is cleared, clear row
+                                j = this.keysPressed[i] & 7;
+                                this.registers[0][1] &= (255 - (1 << j));
+                            }
+                        }
+                        for (i = 7; i >= 0; i--) {
+                            j = 1 << i;
+                            if (this.currJoyPort == addr) {
+                                this.registers[0][addr] &= (255 - j);
+                                this.registers[0][addr] |= (this.currJoyState & j);
+                            }
                         }
                     }
                     break;
@@ -102,7 +195,7 @@ define(function() {
             return this.registers[chip][addr];
         },
         io_w: function(addr, val) {
-            var chip = (addr & 0x0100) ? 1 : 0;
+            var i, j, chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
             val &= 255;
 
@@ -152,50 +245,78 @@ define(function() {
         },
         handlers: {
             keydown: function(e) {
-                switch (e.keyCode) {
-                    case 37:
+                var i, k = this.keymap[e.keyCode];
+                if (k === undefined) {
+                    return;
+                }
+
+                e.preventDefault();
+                switch (k) {
+                    case 'L':
                         $('#joy_left').addClass('active');
                         this.currJoyState &= (255 - this.JOY_LEFT);
                         break;
-                    case 38:
+                    case 'U':
                         $('#joy_up').addClass('active');
                         this.currJoyState &= (255 - this.JOY_UP);
                         break;
-                    case 39:
+                    case 'R':
                         $('#joy_right').addClass('active');
                         this.currJoyState &= (255 - this.JOY_RIGHT);
                         break;
-                    case 40:
+                    case 'D':
                         $('#joy_down').addClass('active');
                         this.currJoyState &= (255 - this.JOY_DOWN);
                         break;
-                    case 32:
+                    case 'FIRE':
                         $('#joy_fire').addClass('active');
                         this.currJoyState &= (255 - this.JOY_FIRE);
+                        break;
+                    case 'NMI':
+                        break;
+                    default:
+                        i = this.keysPressed.indexOf(k);
+                        if (i == -1) {
+                            this.keysPressed.push(k);
+                        }
                         break;
                 }
             },
             keyup: function(e) {
-                switch (e.keyCode) {
-                    case 37:
+                var i, k = this.keymap[e.keyCode];
+                if (k === undefined) {
+                    return;
+                }
+
+                e.preventDefault();
+                switch (k) {
+                    case 'L':
                         $('#joy_left').removeClass('active');
                         this.currJoyState |= this.JOY_LEFT;
                         break;
-                    case 38:
+                    case 'U':
                         $('#joy_up').removeClass('active');
                         this.currJoyState |= this.JOY_UP;
                         break;
-                    case 39:
+                    case 'R':
                         $('#joy_right').removeClass('active');
                         this.currJoyState |= this.JOY_RIGHT;
                         break;
-                    case 40:
+                    case 'D':
                         $('#joy_down').removeClass('active');
                         this.currJoyState |= this.JOY_DOWN;
                         break;
-                    case 32:
+                    case 'FIRE':
                         $('#joy_fire').removeClass('active');
                         this.currJoyState |= this.JOY_FIRE;
+                        break;
+                    case 'NMI':
+                        break;
+                    default:
+                        i = this.keysPressed.indexOf(k);
+                        if (i >= 0) {
+                            this.keysPressed.splice(i, 1);
+                        }
                         break;
                 }
             }
@@ -308,6 +429,7 @@ define(function() {
             this.CNTPIN_prev = false;
             this.IRQ = [0,0];
             this.IRM = [0,0];
+            this.keysPressed = [];
 
             var i, j;
             this.timers.length = 0;
