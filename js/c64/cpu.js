@@ -380,6 +380,7 @@ define(function() {
                         return false;
                     case 2:
                         this.reg.A = this.util.pop.call(this);
+                        this.util.setNZ.call(this, this.reg.A);
                 }
                 return true;
             },
@@ -407,7 +408,7 @@ define(function() {
                 if (this.reg.P & this.flags.C) {
                     this.reg.operand |= 1;
                 }
-                this.util.setFlag.call(this, this.flags.C, this.reg.operand > 255);
+                this.util.setFlag.call(this, this.flags.C, this.reg.operand & 256);
                 this.reg.operand &= 255;
                 this.util.setNZ.call(this, this.reg.operand);
                 return true;
