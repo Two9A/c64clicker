@@ -273,6 +273,7 @@ define(function() {
                         this.currJoyState &= (255 - this.JOY_FIRE);
                         break;
                     case 'NMI':
+                        this.owner.CPU.signal('NMI');
                         break;
                     default:
                         i = this.keysPressed.indexOf(k);

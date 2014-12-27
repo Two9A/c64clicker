@@ -245,7 +245,7 @@ require([
             C64.loadGame().done(function(){
                 $('#click').html('Render <span id="pixels_per_click"></span>');
                 $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
-            });
+            }.bind(this));
         },
         inc: function(amt) {
             this.bank = this.bank.add(amt);
