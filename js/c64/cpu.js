@@ -113,25 +113,25 @@ define(function() {
             ADC: function() {
                 var res = this.reg.operand + this.reg.A + ((this.reg.P & this.flags.C) ? 1 : 0);
                 if (this.reg.P & this.flags.D) {
-                    this.util.setFlag.call(this, this.flags.Z, res == 0);
+                    this.util.setFlag.call(this, this.flags.Z, (res & 255) == 0);
                     if ((this.reg.operand & 15) + (this.reg.A & 15) + ((this.reg.P & this.flags.C) ? 1 : 0) > 9) {
                         res += 6;
                     }
                     this.util.setFlag.call(this, this.flags.N, res & 128);
-                    this.util.setFlag.call(this, this.flags.V, !(
-                        ((this.reg.A ^ this.reg.operand) & 128) &&
-                        ((this.reg.A ^ res) && 128)
-                    ));
+                    this.util.setFlag.call(this, this.flags.V,
+                        (!((this.reg.A ^ this.reg.operand) & 128)) &&
+                        ((this.reg.A ^ res) & 128)
+                    );
                     if (res > 0x99) {
                         res += 0x60;
                     }
                     this.util.setFlag.call(this, this.flags.C, res > 0x99);
                 } else {
-                    this.util.setNZ.call(this, res);
-                    this.util.setFlag.call(this, this.flags.V, !(
-                        ((this.reg.A ^ this.reg.operand) & 128) &&
-                        ((this.reg.A ^ res) && 128)
-                    ));
+                    this.util.setNZ.call(this, res & 255);
+                    this.util.setFlag.call(this, this.flags.V,
+                        (!((this.reg.A ^ this.reg.operand) & 128)) &&
+                        ((this.reg.A ^ res) & 128)
+                    );
                     this.util.setFlag.call(this, this.flags.C, res > 255);
                 }
 
@@ -183,7 +183,7 @@ define(function() {
             BIT: function() {
                 this.util.setFlag.call(this, this.flags.N, this.reg.operand & 128);
                 this.util.setFlag.call(this, this.flags.V, this.reg.operand & 64);
-                this.util.setFlag.call(this, this.flags.Z, this.reg.operand & this.reg.A);
+                this.util.setFlag.call(this, this.flags.Z, (this.reg.operand & this.reg.A) == 0);
                 return true;
             },
             BMI: function() {
@@ -483,7 +483,7 @@ define(function() {
                 this.util.setNZ.call(this, res & 255);
                 this.util.setFlag.call(this, this.flags.V,
                     ((this.reg.A ^ this.reg.operand) & 128) &&
-                    ((this.reg.A ^ res) && 128)
+                    ((this.reg.A ^ res) & 128)
                 );
                 if (this.reg.P & this.flags.D) {
                     if ((this.reg.A & 15) - ((this.reg.P & this.flags.C) ? 0 : 1) < (this.reg.operand & 15)) {
@@ -902,6 +902,47 @@ define(function() {
                 return true;
             }
         },
+        disasm: {
+            imp: function() {
+                return '';
+            },
+            acc: function() {
+                return 'a';
+            },
+            imm: function() {
+                return '#$' + this.pad(this.curOp[1], '0', 2);
+            },
+            z: function() {
+                return '$' + this.pad(this.curOp[1], '0', 2);
+            },
+            zx: function() {
+                return '$' + this.pad(this.curOp[1], '0', 2) + ',x';
+            },
+            zy: function() {
+                return '$' + this.pad(this.curOp[1], '0', 2) + ',y';
+            },
+            abs: function() {
+                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4);
+            },
+            abx: function() {
+                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ',x';
+            },
+            aby: function() {
+                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ',y';
+            },
+            ind: function() {
+                return '($' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ')';
+            },
+            rel: function() {
+                return '$' + this.pad(this.reg.addr, '000', 4);
+            },
+            izx: function() {
+                return '($' + this.pad(this.curOp[1], '0', 2) + '),Y';
+            },
+            izy: function() {
+                return '($' + this.pad(this.curOp[1], '0', 2) + ',X)';
+            }
+        },
         map: [
             ['BRK','imp',1,7],['ORA','izx',2,6],['HLT','imp',1,2],['SLO','izx',2,8],
             ['NOP','z',  2,3],['ORA','z',  2,3],['ASL','z',  2,5],['SLO','z',  2,5],
@@ -1015,6 +1056,7 @@ define(function() {
             this.clock++;
             this.curCycle++;
             if (this.curOp.length == 0) {
+                this.reg.origPC = this.reg.PC;
                 if (this.signalled && !(this.reg.P & this.flags.I)) {
                     this.curOp.push(this.signalled);
                     this.reg.PC = (this.reg.PC + 1) & 0xFFFF;
@@ -1030,6 +1072,13 @@ define(function() {
                         this.reg.operated = this.ops[op[0]].call(this);
                     }
                     if (this.reg.operated) {
+                        if (this.owner.game.debug && !this.reg.printed) {
+                            if (this.clock > this.printedTo) {
+                                this.reg.printed = true;
+                                console.log(this.debugString());
+                                this.printedTo = this.clock;
+                            }
+                        }
                         if (this.reg.writeflag) {
                             if (this.addr[op[1] + '_w'].call(this)) {
                                 this.resetOp();
@@ -1040,21 +1089,45 @@ define(function() {
                     }
                 }
             }
+        },
+        debugString: function() {
+            var i, opcodes = '',
+                operand = this.disasm[this.map[this.curOp[0]][1]].call(this).toUpperCase();
 
-            if (this.owner.game.debug) {
-                if (this.clock > this.printedTo) {
-                    console.log(
-                        this.clock,
-                        this.curOp,
-                        this.curOp.length
-                            ? (this.map[this.curOp[0]][0] + this.map[this.curOp[0]][1])
-                            : 'END',
-                        this.curCycle,
-                        $.extend({}, this.reg)
-                    );
-                    this.printedTo++;
-                }
+            for (i = 0; i < this.curOp.length; i++) {
+                opcodes += this.pad(this.curOp[i], '0', 2, true);
+                opcodes += ' ';
             }
+            while (opcodes.length < 12) {
+                opcodes += ' ';
+            }
+            while (operand.length < 10) {
+                operand += ' ';
+            }
+
+            return [
+                '.C:' + this.pad(this.reg.origPC, '000', 4),
+                ' ' + opcodes,
+                this.map[this.curOp[0]][0], operand, '-',
+                "A:" + this.pad(this.reg.A, '0', 2, true),
+                "X:" + this.pad(this.reg.X, '0', 2, true),
+                "Y:" + this.pad(this.reg.Y, '0', 2, true),
+                "S:" + this.pad(this.reg.S, '0', 2),
+                (
+                    ((this.reg.P & this.flags.N) ? 'N' : '.') +
+                    ((this.reg.P & this.flags.V) ? 'V' : '.') +
+                    '-' +
+                    ((this.reg.P & this.flags.B) ? 'B' : '.') +
+                    ((this.reg.P & this.flags.D) ? 'D' : '.') +
+                    ((this.reg.P & this.flags.I) ? 'I' : '.') +
+                    ((this.reg.P & this.flags.Z) ? 'Z' : '.') +
+                    ((this.reg.P & this.flags.C) ? 'C' : '.')
+                ), ' ',
+                this.clock
+            ].join(' ');
+        },
+        pad: function(val, padder, len, upper) {
+            return (padder + val.toString(16))[upper ? 'toUpperCase' : 'toLowerCase']().slice(-len);
         },
         signal: function(line) {
             this.signalled = this.interruptSignals[line] || null;
@@ -1086,7 +1159,9 @@ define(function() {
                 operated: false,
                 writeflag: false,
                 writeonly: false,
+                printed: false,
                 operand: null,
+                origPC: null,
                 addr: null,
                 tmp1: null,
                 tmp2: null,
@@ -1104,7 +1179,9 @@ define(function() {
             this.reg.operated = false;
             this.reg.writeflag = false;
             this.reg.writeonly = false;
+            this.reg.printed = false;
             this.reg.operand = null;
+            this.reg.origPC = null;
             this.reg.addr = null;
             this.reg.tmp1 = null;
             this.reg.tmp2 = null;

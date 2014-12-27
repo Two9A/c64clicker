@@ -3,7 +3,9 @@ define([
     'c64/mmu',
     'c64/cpu',
     'c64/cia',
-], function(VIC, MMU, CPU, CIA) {
+    'thirdparty/jquery-ajax-blob-arraybuffer',
+    'thirdparty/jszip/dist/jszip.min'
+], function(VIC, MMU, CPU, CIA, blob, JSZip) {
     var C64 = {
         MMU: MMU,
         CPU: CPU,
@@ -52,10 +54,58 @@ define([
             C64[i].setState(C64.savedFrames[frame][i]);
         }
     };
+    C64.dropFrame = function(frame) {
+        if (C64.savedFrames[frame]) {
+            delete C64.savedFrames[frame];
+        }
+    };
 
-    C64.resetToBasic = function() {
-        C64.MMU.load('/rom/kernal.rom', 'KERNAL');
-        C64.MMU.load('/rom/basic.rom', 'BASIC');
+    C64.loadGame = function() {
+        var promise = $.Deferred();
+
+        $.ajax({
+            url: '/rom/game.zip',
+            dataType: 'arraybuffer',
+            beforeSend: function(xhr) {
+                xhr.overrideMimeType("text/plain; charset=x-user-defined");
+            }
+        }).done(function(data) {
+            this.dropFrame(0);
+            this.CPU.reset();
+            this.MMU.reset();
+
+            var i, zip = new JSZip();
+            zip.load(data);
+
+            var kernal = zip.file('kernal.rom').asUint8Array(),
+                basic = zip.file('basic.rom').asUint8Array(),
+                game = zip.file('game.bin').asUint8Array();
+
+            for (var i = 0; i < kernal.length; i++) {
+                this.MMU.romKernal[i] = kernal[i];
+            }
+            for (var i = 0; i < basic.length; i++) {
+                this.MMU.romBasic[i] = basic[i];
+            }
+            for (var i = 0; i < game.length; i++) {
+                this.MMU.ram[0xC000 + i] = game[i];
+            }
+
+            this.CIA.reset();
+            this.VIC.reset();
+
+            for (i = 0; i < 10; i++) {
+                this.VIC.renderFrame(this.VIC.sizes.FRAME_SIZE);
+            }
+            this.CPU.reg.PC = 0xC000;
+
+            this.VIC.backContext.fillStyle = 'black';
+            this.VIC.backContext.fillRect(0, 0, this.VIC.sizes.RASTER_LENGTH, this.VIC.sizes.RASTER_COUNT);
+            this.saveFrame(0, 1);
+            promise.resolve();
+        }.bind(this));
+
+        return promise;
     };
 
     return C64;

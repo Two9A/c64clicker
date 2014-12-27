@@ -1,4 +1,4 @@
-define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
+define(function() {
     return {
         busLock: null,
         vicBank: null,
@@ -105,43 +105,6 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
                     break;
             }
         },
-        load: function(file, addr) {
-            $.ajax({
-                url: file,
-                dataType: 'arraybuffer',
-                beforeSend: function(xhr) {
-                    xhr.overrideMimeType("text/plain; charset=x-user-defined");
-                }
-            }).done(function(data) {
-                this.owner.CPU.reset();
-                
-                this.reset();
-                var i, dataArr = new Uint8Array(data);
-                var dest;
-                switch (addr) {
-                    case 'KERNAL':
-                        dest = 'romKernal';
-                        addr = 0;
-                        break;
-                    case 'BASIC':
-                        dest = 'romBasic';
-                        addr = 0;
-                        break;
-                    default:
-                        dest = 'ram';
-                        this.romKernal[0x1FFC] = addr & 255;
-                        this.romKernal[0x1FFD] = addr >> 8;
-                        break;
-                }
-                for (var i = 0; i < dataArr.length; i++, addr++) {
-                    this[dest][addr] = dataArr[i];
-                }
-
-                this.owner.CIA.reset();
-                this.owner.VIC.reset();
-                this.owner.saveFrame(0, 1);
-            }.bind(this));
-        },
         getState: function() {
             return {
                 ram: new Uint8Array(this.ram),
@@ -171,7 +134,6 @@ define(['thirdparty/jquery-ajax-blob-arraybuffer'], function() {
             for (i = 0, j = this.charRomSrc.match(/.{2}/g); i < 4096; i++) {
                 this.charRom[i] = parseInt(j[i], 16);
             }
-            this.load('/rom/gamekern.bin', 'KERNAL');
         },
         charRomSrc: [
             '3c666e6e60623c00183c667e666666007c66667c66667c003c66606060663c00',

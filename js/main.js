@@ -240,6 +240,12 @@ require([
             this.showTab('units');
 
             C64.reset();
+
+            $('#click').html('Loading BASIC...');
+            C64.loadGame().done(function(){
+                $('#click').html('Render <span id="pixels_per_click"></span>');
+                $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
+            });
         },
         inc: function(amt) {
             this.bank = this.bank.add(amt);
@@ -569,7 +575,6 @@ require([
             }).on('mouseleave', function() {
                 $(this).powerTip('hide');
             });
-            $('#click').html('Render <span id="pixels_per_click"></span>');
             $('#click').on('click', this.click.bind(this)).nodoubletapzoom();
             $('.tabs li').on('click', function(e) {
                 this.showTab($(e.target).attr('rel'));
