@@ -6,9 +6,12 @@ define(function() {
         JOY_RIGHT: 8,
         JOY_FIRE: 16,
 
+        IEC_ID: 255,
+
         timers: [],
         CNTPIN: null,
         CNTPIN_prev: null,
+        vicBank: null,
 
         IRQ: null,
         IRM: null,
@@ -142,7 +145,8 @@ define(function() {
             switch (addr) {
                 case 0: // Port A
                     if (chip) {
-                        // TODO: RS232/VIC banking
+                        this.registers[1][0] &= 0xFC;
+                        this.registers[1][0] |= (3 - this.vicBank);
                     } else {
                         for (i = 7; i >= 0; i--) {
                             j = 1 << i;
@@ -200,6 +204,14 @@ define(function() {
             val &= 255;
 
             switch (addr) {
+                case 0:
+                    if (chip) {
+                        this.vicBank = (3 - (val & 3));
+                        this.owner.IEC[val & 8 ? 'pulldown' : 'release'](this.IEC_ID, 'ATN');
+                        this.owner.IEC[val & 16 ? 'pulldown' : 'release'](this.IEC_ID, 'CLK');
+                        this.owner.IEC[val & 32 ? 'pulldown' : 'release'](this.IEC_ID, 'DATA');
+                    }
+                    break;
                 case 4: // Timer A lo latch
                     this.timers[chip][0].latch &= 0xFF00;
                     this.timers[chip][0].latch |= val;
@@ -273,6 +285,7 @@ define(function() {
                         this.currJoyState &= (255 - this.JOY_FIRE);
                         break;
                     case 'NMI':
+                        this.owner.IEC.signal('RESET');
                         this.owner.CPU.signal('NMI');
                         break;
                     default:
@@ -416,6 +429,14 @@ define(function() {
                     }
                 }
             }
+
+            this.registers[1][0] &= 0x3F;
+            if (!this.owner.IEC.check('CLK')) {
+                this.registers[1][0] |= 0x40;
+            }
+            if (!this.owner.IEC.check('DATA')) {
+                this.registers[1][0] |= 0x80;
+            }
         },
         reset: function() {
             // All pins are pulled high on the data ports
@@ -431,6 +452,8 @@ define(function() {
             this.IRQ = [0,0];
             this.IRM = [0,0];
             this.keysPressed = [];
+            this.vicBank = 0;
+            this.owner.IEC.register(this.IEC_ID);
 
             var i, j;
             this.timers.length = 0;

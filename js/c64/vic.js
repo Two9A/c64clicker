@@ -401,6 +401,7 @@ define(function() {
 
                 if (!(i&7)) {
                     this.owner.CIA.step();
+                    this.owner.DISK.step();
                     this.owner.CPU.step();
                 }
             } while (i < pixels);

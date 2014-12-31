@@ -2,14 +2,18 @@ define([
     'c64/vic',
     'c64/mmu',
     'c64/cpu',
+    'c64/iec',
     'c64/cia',
+    'c64/disk',
     'thirdparty/jquery-ajax-blob-arraybuffer',
     'thirdparty/jszip/dist/jszip.min'
-], function(VIC, MMU, CPU, CIA, blob, JSZip) {
+], function(VIC, MMU, CPU, IEC, CIA, DISK, blob, JSZip) {
     var C64 = {
         MMU: MMU,
         CPU: CPU,
+        IEC: IEC,
         CIA: CIA,
+        DISK: DISK,
         VIC: VIC
     };
     for (var i in C64) {
@@ -21,7 +25,9 @@ define([
     C64.reset = function() {
         C64.MMU.reset();
         C64.CPU.reset();
+        C64.IEC.reset();
         C64.CIA.reset();
+        C64.DISK.reset();
         C64.VIC.reset();
         C64.saveFrame(0, 1);
     };
@@ -37,7 +43,9 @@ define([
         C64.savedFrames[frame] = {
             MMU: C64.MMU.getState(),
             CPU: C64.CPU.getState(),
+            IEC: C64.IEC.getState(),
             CIA: C64.CIA.getState(),
+            DISK: C64.DISK.getState(),
             VIC: C64.VIC.getState()
         };
         for (i in C64.savedFrames) {
@@ -91,7 +99,9 @@ define([
                 this.MMU.ram[0xC000 + i] = game[i];
             }
 
+            this.IEC.reset();
             this.CIA.reset();
+            this.DISK.reset();
             this.VIC.reset();
 
             for (i = 0; i < 10; i++) {
