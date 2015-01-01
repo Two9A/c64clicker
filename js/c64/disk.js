@@ -264,7 +264,7 @@ define(function() {
                             this.iec.bitpos = 0;
                         } else {
                             // Ready to fire
-                            if (this.iec.statetime >= 200) {
+                            if (this.iec.statetime >= 80) {
                                 this.owner.IEC.log(this.IEC_ID, 'sending');
                                 this.owner.IEC.pulldown(this.IEC_ID, 'CLK');
                                 this.iec.state = 10;
@@ -275,29 +275,31 @@ define(function() {
                     break;
                 case 10:
                     // Sending one bit
-                    val = (this.iec.data & (1 << this.iec.bitpos));
-                    this.owner.IEC.log(this.IEC_ID, 'sending '+val);
-                    this.owner.IEC[val ? 'release' : 'pulldown'](this.IEC_ID, 'DATA');
-                    this.owner.IEC.release(this.IEC_ID, 'CLK');
-                    this.iec.state = 11;
-                    this.iec.bitpos++;
+                    if (this.iec.statetime >= 60) {
+                        val = (this.iec.data & (1 << this.iec.bitpos));
+                        this.owner.IEC.log(this.IEC_ID, 'sending '+val+' at bit '+this.iec.bitpos);
+                        this.owner.IEC[val ? 'release' : 'pulldown'](this.IEC_ID, 'DATA');
+                        this.iec.state = 11;
+                        this.iec.bitpos++;
+                    }
                     break;
                 case 11:
+                    // Bit ready for latching
+                    if (this.iec.statetime >= 60) {
+                        this.owner.IEC.release(this.IEC_ID, 'CLK');
+                        this.iec.state = 12;
+                    }
+                    break;
+                case 12:
                     // Signalling end of bit
                     if (this.iec.statetime >= 60) {
                         this.owner.IEC.pulldown(this.IEC_ID, 'CLK');
                         this.owner.IEC.release(this.IEC_ID, 'DATA');
-                        this.iec.state = (this.iec.bitpos < 8) ? 12 : 13;
-                    }
-                    break;
-                case 12:
-                    // Start of next bit
-                    if (this.iec.statetime >= 60) {
-                        this.iec.state = 10;
+                        this.iec.state = (this.iec.bitpos < 8) ? 10 : 13;
                     }
                     break;
                 case 13:
-                    if (this.statetime >= 20) {
+                    if (this.iec.statetime >= 20) {
                         if (this.owner.IEC.check('DATA')) {
                             this.owner.IEC.log(this.IEC_ID, 'byte acknowledged');
                             this.iec.state = 8;

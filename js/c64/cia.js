@@ -365,6 +365,14 @@ define(function() {
             }
             this.registers[0][this.currJoyPort] &= 0xE0;
             this.registers[0][this.currJoyPort] |= this.currJoyState;
+
+            this.registers[1][0] &= 0x3F;
+            if (!this.owner.IEC.check('CLK')) {
+                this.registers[1][0] |= 0x40;
+            }
+            if (!this.owner.IEC.check('DATA')) {
+                this.registers[1][0] |= 0x80;
+            }
             this.timers = t;
         },
         step: function() {
