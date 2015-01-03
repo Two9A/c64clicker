@@ -89,9 +89,7 @@ define(function() {
                 if (this.currFilePos < this.directory[0].length) {
                     this.iec.dataready = true;
                     this.iec.data = this.directory[0].data[this.currFilePos++];
-                    if (this.currFilePos == this.directory[0].length) {
-                        this.iec.datalast = true;
-                    }
+                    this.iec.datalast = (this.currFilePos == this.directory[0].length);
                 } else {
                     this.iec.dataready = false;
                 }
@@ -255,6 +253,7 @@ define(function() {
                     }
                     break;
                 case 9:
+                    this.iec.dataready = false;
                     if (!this.owner.IEC.check('DATA')) {
                         // Ack'd, indicate EOI if necessary
                         if (this.iec.datalast) {
@@ -265,7 +264,7 @@ define(function() {
                         } else {
                             // Ready to fire
                             if (this.iec.statetime >= 80) {
-                                this.owner.IEC.log(this.IEC_ID, 'sending');
+                                this.owner.IEC.log(this.IEC_ID, 'sending byte '+this.currFilePos + ' of '+this.directory[0].length);
                                 this.owner.IEC.pulldown(this.IEC_ID, 'CLK');
                                 this.iec.state = 10;
                                 this.iec.bitpos = 0;
@@ -275,6 +274,7 @@ define(function() {
                     break;
                 case 10:
                     // Sending one bit
+                    this.iec.datalast = false;
                     if (this.iec.statetime >= 60) {
                         val = (this.iec.data & (1 << this.iec.bitpos));
                         this.owner.IEC.log(this.IEC_ID, 'sending '+val+' at bit '+this.iec.bitpos);
@@ -303,7 +303,7 @@ define(function() {
                         if (this.owner.IEC.check('DATA')) {
                             this.owner.IEC.log(this.IEC_ID, 'byte acknowledged');
                             this.iec.state = 8;
-                            if (this.iec.datalast) {
+                            if (this.currFilePos == this.directory[0].length) {
                                 // Turnaround back to listening
                                 this.owner.IEC.log(this.IEC_ID, 'turning back around');
                                 this.owner.IEC.release(this.IEC_ID, 'CLK');
