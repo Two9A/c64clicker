@@ -23,13 +23,26 @@ Credits
 
 Libraries included:
 
-* BigInteger, by Matthew Crumley and John Tobey: http://silentmatt.com/biginteger/
-* jQuery.PowerTip, by Steven Benner: http://stevenbenner.github.com/jquery-powertip/
-* Require.js, by the Dojo Foundation: http://github.com/jrburke/requirejs
-* jQuery-Ajax-Blob-ArrayBuffer, by Christopher Keefer: https://gist.github.com/SaneMethod/7548768
-* JSZip, by Stuart Knightley: https://github.com/Stuk/jszip
+* [BigInteger, by Matthew Crumley and John Tobey](http://silentmatt.com/biginteger/)
+* [jQuery.PowerTip, by Steven Benner](http://stevenbenner.github.com/jquery-powertip/)
+* [Require.js, by the Dojo Foundation](http://github.com/jrburke/requirejs)
+* [jQuery-Ajax-Blob-ArrayBuffer, by Christopher Keefer](https://gist.github.com/SaneMethod/7548768)
+* [JSZip, by Stuart Knightley](https://github.com/Stuk/jszip)
 * And, of course, jQuery.
 
 Test ROMs included:
 
-* Klaus Dormann's 6502 functional tests: https://github.com/redline6561/cl-6502/blob/b0087903/tests/6502_functional_test.a65
+* [Klaus Dormann's 6502 functional tests](https://github.com/redline6561/cl-6502/blob/b0087903/tests/6502_functional_test.a65)
+
+Resources that have been infinitely useful:
+
+* [The C64 memory map](http://sta.c64.org/cbm64mem.html)
+* [The VIC-II For Beginners series, by actraiser, 2013](http://dustlayer.com/vic-ii/2013/4/22/when-visibility-matters)
+* ["The MOS 6567/6569 video controller and its application in the Commodore 64", by Christian Bauer, 1996](http://www.zimmers.net/cbmpics/cbm/c64/vic-ii.txt)
+* ["Documentation for the NMOS 65xx instruction set", by John West and Marko Makela, 1994](http://www.zimmers.net/anonftp/pub/cbm/documents/chipdata/64doc)
+* [6502 opcode matrix, by Graham/Oxyron, 2012](http://www.oxyron.de/html/opcodes02.html)
+* [Opcode pseudocode from VICE, compiled at Nesdev](http://nesdev.com/6502.txt)
+* ["Internals of BRK/IRQ/NMI/RESET on a MOS 6502", by Michael Steil, 2010](http://www.pagetable.com/?p=410)
+* [CIA register map, on the C64 Wiki](http://www.c64-wiki.com/index.php/CIA)
+* [Kernal/BASIC disassembly, by Marko Makela, 1994](http://www.ffd2.com/fridge/docs/c64-diss.html)
+* ["How the VIC/64 Serial Bus Works", by Jim Butterfield, 1983](ftp://ftp.zimmers.net/pub/cbm/programming/serial-bus.pdf)
