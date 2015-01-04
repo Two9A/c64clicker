@@ -104,9 +104,7 @@ define([
             this.DISK.reset();
             this.VIC.reset();
 
-            for (i = 0; i < 10; i++) {
-                this.VIC.renderFrame(this.VIC.sizes.FRAME_SIZE);
-            }
+            this.VIC.renderPixels(this.VIC.sizes.FRAME_SIZE * 10);
             this.CPU.reg.PC = 0xC000;
 
             this.VIC.backContext.fillStyle = 'black';

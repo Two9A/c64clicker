@@ -27,7 +27,8 @@ require([
         debug: false,
 
         bank: null,
-        prevBank: null,
+        stepBank: null,
+        prevStepBank: null,
         produced: null,
         spent: null,
         maxPrice: null,
@@ -36,8 +37,6 @@ require([
         cps_div: null,
         cps_step: null,
         step_prev: null,
-        frames: null,
-        thisFrame: null,
         currPeriodStr: null,
 
         units: [{
@@ -203,11 +202,10 @@ require([
         reset: function() {
             this.cps = BigInteger(0);
             this.bank = BigInteger(0);
+            this.prevStepBank = BigInteger(0);
             this.produced = BigInteger(0);
             this.spent = BigInteger(0);
             this.maxPrice = BigInteger(0);
-            this.frames = BigInteger(0);
-            this.thisFrame = BigInteger(0);
             this.clickPower = BigInteger(1);
             this.cps_step = 0;
             this.cps_div = 0;
@@ -250,17 +248,15 @@ require([
         inc: function(amt) {
             this.bank = this.bank.add(amt);
             this.produced = this.produced.add(amt);
-            this.thisFrame = this.thisFrame.add(amt);
-            while (this.thisFrame.compare(VIC.sizes.FRAME_SIZE) >= 0) {
-                C64.restoreFrame(this.frames.toJSValue());
-                VIC.renderFrame(VIC.sizes.FRAME_SIZE);
-                this.thisFrame = this.thisFrame.subtract(VIC.sizes.FRAME_SIZE);
-                this.frames = this.frames.next();
-                C64.saveFrame(
-                    this.frames.toJSValue(),
-                    this.maxPrice.divide(VIC.sizes.FRAME_SIZE).toJSValue()
-                );
-            }
+            VIC.renderPixels(this.bank.subtract(this.prevStepBank).toJSValue());
+            this.prevStepBank = BigInteger(this.bank);
+        },
+        dec: function(amt) {
+            this.bank = this.bank.subtract(amt);
+            this.spent = this.spent.add(amt);
+            C64.restoreFrame(this.bank.divide(VIC.sizes.FRAME_SIZE).toJSValue());
+            VIC.renderPixels(this.bank.modPow(BigInteger(1), VIC.sizes.FRAME_SIZE).toJSValue());
+            this.prevStepBank = BigInteger(this.bank);
         },
         click: function() {
             this.inc(this.clickPower);
@@ -276,10 +272,11 @@ require([
                 this.inc(this.cps);
             }
             this.cps_step = 0;
+            this.prevStepBank = BigInteger(this.bank);
             this.step_prev = now;
         },
         stepDraw: function() {
-            var bank, thisFrame, frames, cps_amt, i, j;
+            var bank, cps_amt, i, j;
 
             this.cps_step++;
             cps_amt = (0.0 + this.cps_step) * this.cps_div;
@@ -290,33 +287,8 @@ require([
                 bank = this.bank.add(cps_amt);
             }
 
-            thisFrame = this.thisFrame.add(cps_amt);
-            frames = this.frames;
-            while (thisFrame.compare(VIC.sizes.FRAME_SIZE) >= 0) {
-                C64.restoreFrame(frames.toJSValue());
-                VIC.renderFrame(VIC.sizes.FRAME_SIZE);
-                thisFrame = thisFrame.subtract(VIC.sizes.FRAME_SIZE);
-                frames = frames.next();
-                C64.saveFrame(
-                    frames.toJSValue(),
-                    this.maxPrice.divide(VIC.sizes.FRAME_SIZE).toJSValue()
-                );
-            }
-
-            if (this.prevBank && bank.compare(this.prevBank) === 0) {
-                // State has changed not one iota, give up
-                return;
-            }
-
-            this.prevBank = BigInteger(bank);
-
-            // We're running a system here, and it may change state mid-frame,
-            // so we have to run it from the start of frame to render it
-            var renderEndpoint = 0;
-            C64.restoreFrame(frames.toJSValue());
-            if (bank.isPositive()) {
-                renderEndpoint = VIC.renderFrame(thisFrame.toJSValue());
-            }
+            var ret = VIC.renderPixels(bank.subtract(this.prevStepBank).toJSValue());
+            this.prevStepBank = BigInteger(bank);
 
             var $item;
             for (i in this.units) {
@@ -362,16 +334,16 @@ require([
                 }
             }
 
-            i = thisFrame.divide(VIC.sizes.RASTER_LENGTH).toJSValue();
-            j = thisFrame.subtract(i * VIC.sizes.RASTER_LENGTH).toJSValue();
+            i = 0|(ret.thisFrame / VIC.sizes.RASTER_LENGTH);
+            j = 0|(ret.thisFrame % VIC.sizes.RASTER_LENGTH);
 
             $('#bank').text(this.pluralize(bank.toString(), 'pixel'));
             $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
             $('#clock').text(this.pluralize(this.cps.divide(8).toString(), 'Hz', false));
             $('#cps').text(this.pluralize(this.cps.toString(), 'pixel') + '/s');
-            $('#curframe').text(frames.add(1).toString());
+            $('#curframe').text(ret.frames - 10);
             $('#curraster').text(i);
-            $('#curperiod').text(VIC.endpointStrings[renderEndpoint]);
+            $('#curperiod').text(VIC.endpointStrings[ret.mode]);
             $('.cursor_x').css('left', j + 6);
             $('.cursor_y').css('top', i + 42);
             this.frontContext.drawImage(VIC.backCanvas, 0, 0);
@@ -395,13 +367,7 @@ require([
                     // How did we get here again?
                     return;
                 }
-                this.bank = this.bank.subtract(this.units[i].currPrice);
-                this.thisFrame = this.thisFrame.subtract(this.units[i].currPrice);
-                while (this.thisFrame.isNegative()) {
-                    this.thisFrame = this.thisFrame.add(VIC.sizes.FRAME_SIZE);
-                    this.frames = this.frames.prev();
-                }
-                this.spent = this.spent.add(this.units[i].currPrice);
+                this.dec(this.units[i].currPrice);
                 this.cps = this.cps.add(this.units[i].cps);
                 if (this.cps.compare(1048576) < 0) {
                     this.cps_div = this.cps.toJSValue() / this.FPS;
@@ -419,13 +385,7 @@ require([
                 if (this.bank.compare(this.upgrades[i].price) < 0) {
                     return;
                 }
-                this.bank = this.bank.subtract(this.upgrades[i].price);
-                this.thisFrame = this.thisFrame.subtract(this.upgrades[i].price);
-                while (this.thisFrame.isNegative()) {
-                    this.thisFrame = this.thisFrame.add(VIC.sizes.FRAME_SIZE);
-                    this.frames = this.frames.prev();
-                }
-                this.spent = this.spent.add(this.upgrades[i].price);
+                this.dec(this.upgrades[i].price);
                 if (this.upgrades[i].power) {
                     this.clickPower = this.clickPower.add(this.upgrades[i].power);
                 } else if (this.upgrades[i].effect_vic) {
@@ -563,6 +523,7 @@ require([
             this.reset();
             this.load();
             this.renderItems();
+            this.prevStepBank = this.bank.divide(VIC.sizes.FRAME_SIZE).multiply(VIC.sizes.FRAME_SIZE);
 
             $('.head h1 a').on('mouseenter', function(e) {
                 if (!$(this).data('powertip')) {
@@ -595,7 +556,7 @@ require([
 
             this.FPS = parseInt(window.localStorage['c64click.FPS']) || 40;
             this.debug = !!(0|window.localStorage['c64click.debug']);
-            var i, vars = ['bank', 'cps', 'clickPower', 'produced', 'spent', 'frames', 'thisFrame'];
+            var i, vars = ['bank', 'cps', 'clickPower', 'produced', 'spent'];
             for (i in vars) {
                 this[vars[i]] = BigInteger(window.localStorage['c64click.' + vars[i]]);
             }
@@ -633,9 +594,7 @@ require([
                 'cps':          this.cps.toString(),
                 'clickPower':   this.clickPower.toString(),
                 'produced':     this.produced.toString(),
-                'spent':        this.spent.toString(),
-                'frames':       this.frames.toString(),
-                'thisFrame':    this.thisFrame.toString()
+                'spent':        this.spent.toString()
             };
             state['VIC.border'] = VIC.BORDER;
             state['VIC.background'] = VIC.BG0;

@@ -10,6 +10,8 @@ define(function() {
         backCanvas: null,
         backContext: null,
         renderedFrames: {},
+        frames: null,
+        thisFrame: null,
 
         SCREENPTR:  null,
         CHARPTR:    null,
@@ -231,10 +233,10 @@ define(function() {
                 this.registers[addr] = val;
             }
         },
-        renderFrame: function(pixels) {
+        renderPixels: function(pixels, skipFrames) {
             var i = 0, j, k, p;
             var x = 0, y = 0, pos = 0, row = 0, loc = 0;
-            var sx, cx, cy, px, py, pixel,
+            var sx, cx, cy, px, py, pixel, mode = 0,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
                 right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBL,
@@ -243,21 +245,35 @@ define(function() {
                 locBase = this.SCREENPTR * 1024,
                 charBase = this.CHARPTR * 2048;
 
+            if (skipFrames) {
+                debugger;
+                this.frames += (0|(pixels / this.sizes.FRAME_SIZE));
+                pixels %= this.sizes.FRAME_SIZE;
+            }
+
+            y = 0|(this.thisFrame / this.sizes.RASTER_LENGTH);
+            x = this.thisFrame % this.sizes.RASTER_LENGTH;
+            pos = this.thisFrame * 4;
+            if (y >= top_border && y < bottom_border) {
+                j = this.sizes.RASTER_LENGTH * 8;
+                row = (
+                    this.thisFrame -
+                    (top_border * this.sizes.RASTER_LENGTH) -
+                    (this.sizes.HBL + this.sizes.BORDER + this.XSCROLL)
+                );
+                if (row % j) {
+                    row += j;
+                }
+                if (row >= 0) {
+                    row = 0|(row / j);
+                    loc = row * 40;
+                }
+            }
+
             var imageData = this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
-            this.RASTER = 0;
+            this.RASTER = y;
 
-            // Bit of a hack...
-            for (j = 0; j < 40; j++) {
-                this.curLineScr[j] = 32;
-            }
-
-            // Catch raster IRQ at line 0
-            if ((this.IRM & 1) && this.RASTERHIT === 0) {
-                this.registers[this.rg.IRQ] |= 0x81;
-                this.owner.CPU.signal('INT');
-            }
-
-            do {
+            if (pixels) do {
                 left_border = this.sizes.HBL + this.sizes.BORDERL;
                 right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBL;
 
@@ -387,11 +403,27 @@ define(function() {
                 imageData.data[pos++] = pixel[2];
                 imageData.data[pos++] = 0xFF;
 
-                x++; i++;
+                x++; i++; this.thisFrame++;
                 if (x == this.sizes.RASTER_LENGTH) {
                     x = 0;
                     y++;
                     this.RASTER++;
+
+                    if (y == this.sizes.RASTER_COUNT) {
+                        y = 0;
+                        this.backContext.putImageData(imageData, 0, 0);
+                        this.owner.saveFrame(++this.frames, 10);
+                        this.thisFrame = 0;
+                        this.RASTER = 0;
+                        pos = 0;
+                        row = 0;
+                        loc = 0;
+    
+                        // Bit of a hack...
+                        for (j = 0; j < 40; j++) {
+                            this.curLineScr[j] = 32;
+                        }
+                    }
 
                     if ((this.IRM & 1) && this.RASTERHIT == y) {
                         this.registers[this.rg.IRQ] |= 0x81;
@@ -399,7 +431,7 @@ define(function() {
                     }
                 }
 
-                if (!(i&7)) {
+                if (!(this.thisFrame & 7)) {
                     this.owner.CIA.step();
                     this.owner.DISK.step();
                     this.owner.CPU.step();
@@ -411,18 +443,25 @@ define(function() {
             // Determine which mode we ended up at
             switch (this.rasterModes[y]) {
                 case 1:
-                    return 1;
+                    mode = 1;
+                    break;
                 case 2:
-                    return (x < 50 || x >= right_hbl) ? 2 : 3;
+                    mode = (x < 50 || x >= right_hbl) ? 2 : 3;
+                    break;
                 case 3:
-                    return (x < left_hbl || x >= right_hbl) ?
+                    mode = (x < left_hbl || x >= right_hbl) ?
                         2 :
                         (x < left_border || x >= right_border || !this.DISPLAY) ?
                             3 :
                             4 ;
+                    break;
             }
 
-            return 0;
+            return {
+                mode: mode,
+                frames: this.frames,
+                thisFrame: this.thisFrame
+            };
         },
         getState: function() {
             var i, ret = {
@@ -431,7 +470,9 @@ define(function() {
                 registers: this.registers.slice(0),
                 spriteRasters: this.spriteRasters.slice(0),
                 rasterModes: this.rasterModes.slice(0),
-                SPR: this.SPR.slice(0)
+                SPR: this.SPR.slice(0),
+                frames: this.frames,
+                thisFrame: this.thisFrame
             };
             for (i in this.stateVars) {
                 ret[this.stateVars[i]] = this[this.stateVars[i]];
@@ -444,6 +485,8 @@ define(function() {
             this.spriteRasters = state.spriteRasters.slice(0);
             this.rasterModes = state.rasterModes.slice(0);
             this.SPR = state.SPR.slice(0);
+            this.frames = state.frames;
+            this.thisFrame = state.thisFrame;
             for (i in state.registers) {
                 this.registers[i] = state.registers[i];
             }
@@ -507,6 +550,8 @@ define(function() {
             this.renderedFrames = {};
             this.backContext.fillStyle = 'black';
             this.backContext.fillRect(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
+            this.frames = 0;
+            this.thisFrame = 0;
         },
         init: function() {
             this.sizes.RASTER_LENGTH = this.sizes.HBL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBL;
