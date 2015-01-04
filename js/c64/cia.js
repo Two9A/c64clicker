@@ -199,7 +199,7 @@ define(function() {
             return this.registers[chip][addr];
         },
         io_w: function(addr, val) {
-            var i, j, chip = (addr & 0x0100) ? 1 : 0;
+            var prevRunning, i, j, chip = (addr & 0x0100) ? 1 : 0;
             addr &= 0x0F;
             val &= 255;
 
@@ -225,7 +225,7 @@ define(function() {
                     this.timers[chip][1].latch |= val;
                     return;
                 case 7: // Timer B hi latch
-                    this.timers[chip][1].latch &= 0x00FF
+                    this.timers[chip][1].latch &= 0x00FF;
                     this.timers[chip][1].latch |= (val << 8);
                     return;
                 case 13: // IRM
@@ -234,21 +234,29 @@ define(function() {
                     }
                     break;
                 case 14: // Timer A control
+                    prevRunning = this.timers[chip][0].running;
                     this.timers[chip][0].running = !!(val & 1);
                     this.timers[chip][0].oneshot = !!(val & 8);
-                    this.timers[chip][0].latchroll = !!(val & 16);
+                    this.timers[chip][0].latchroll = !(val & 16);
                     this.timers[chip][0].mode = (val & 32) >> 5;
                     if (!this.timers[chip][0].running) {
                         this.timers[chip][0].latch &= 255;
                     }
+                    if (!prevRunning && this.timers[chip][0].running) {
+                        this.timers[chip][0].value = this.timers[chip][0].latch;
+                    }
                     break;
                 case 15: // Timer B control
+                    prevRunning = this.timers[chip][1].running;
                     this.timers[chip][1].running = !!(val & 1);
                     this.timers[chip][1].oneshot = !!(val & 8);
-                    this.timers[chip][1].latchroll = !!(val & 16);
+                    this.timers[chip][1].latchroll = !(val & 16);
                     this.timers[chip][1].mode = (val & 96) >> 5;
                     if (!this.timers[chip][1].running) {
                         this.timers[chip][1].latch &= 255;
+                    }
+                    if (!prevRunning && this.timers[chip][1].running) {
+                        this.timers[chip][1].value = this.timers[chip][1].latch;
                     }
                     break;
             }
@@ -391,13 +399,15 @@ define(function() {
                                 timer.value = timer.latchroll ? timer.latch : 65535;
                             }
                             if (j) {
+                                this.IRQ[i] |= 0x02;
                                 if (this.IRM[i] & 2) {
-                                    this.IRQ[i] |= 0x82;
+                                    this.IRQ[i] |= 0x80;
                                     this.owner.CPU.signal('INT');
                                 }
                             } else {
+                                this.IRQ[i] |= 0x01;
                                 if (this.IRM[i] & 1) {
-                                    this.IRQ[i] |= 0x81;
+                                    this.IRQ[i] |= 0x80;
                                     this.owner.CPU.signal('INT');
                                 }
                             }
