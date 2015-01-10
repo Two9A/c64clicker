@@ -68,6 +68,43 @@ define([
         }
     };
 
+    C64.loadDisk = function(d64) {
+        var promise = $.Deferred();
+
+        $.ajax({
+            url: d64,
+            dataType: 'arraybuffer',
+            beforeSend: function(xhr) {
+                xhr.overrideMimeType("text/plain; charset=x-user-defined");
+            }
+        }).done(function(data) {
+            this.dropFrame(0);
+            this.CPU.reset();
+            this.MMU.reset();
+            this.IEC.reset();
+            this.CIA.reset();
+            this.DISK.reset();
+            this.VIC.reset();
+
+            this.VIC.renderPixels(this.VIC.sizes.FRAME_SIZE * 10);
+
+            for (var i = 0; i < 65536; i++) {
+                this.MMU.ram[i] = DISK.loadDump[i];
+            }
+            this.CPU.reg.A  = 0x00;
+            this.CPU.reg.X  = 0x0C;
+            this.CPU.reg.Y  = 0x26;
+            this.CPU.reg.PC = 0xE168;
+            this.CPU.reg.S  = 0xE9;
+
+            this.DISK.load(data);
+            this.saveFrame(0, 1);
+            promise.resolve();
+        }.bind(this));
+
+        return promise;
+    };
+
     C64.loadGame = function() {
         var promise = $.Deferred();
 
@@ -87,7 +124,8 @@ define([
 
             var kernal = zip.file('kernal.rom').asUint8Array(),
                 basic = zip.file('basic.rom').asUint8Array(),
-                game = zip.file('game.bin').asUint8Array();
+                game = zip.file('game.bin').asUint8Array(),
+                loadDump = zip.file('loadram.bin').asUint8Array();
 
             for (var i = 0; i < kernal.length; i++) {
                 this.MMU.romKernal[i] = kernal[i];
@@ -98,6 +136,8 @@ define([
             for (var i = 0; i < game.length; i++) {
                 this.MMU.ram[0xC000 + i] = game[i];
             }
+
+            DISK.loadDump = new Uint8Array(loadDump);
 
             this.IEC.reset();
             this.CIA.reset();

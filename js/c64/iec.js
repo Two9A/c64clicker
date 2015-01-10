@@ -14,7 +14,7 @@ define(function() {
             };
         },
         log: function(device, str) {
-            if (true) {
+            if (this.owner.game.debug) {
                 console.log('[IEC] {'+this.owner.CPU.clock+'} Device '+device+' '+str);
             }
         },

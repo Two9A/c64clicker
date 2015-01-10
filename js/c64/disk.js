@@ -18,19 +18,103 @@ define(function() {
         currCommand: null,
         currChannel: null,
         currFilename: [],
+        currFileEntry: null,
         currFilePos: null,
 
-        directory: [
-            {
-                name: 'foo',
-                length: 26,
-                data: [
-                    0x01,0x08,0x0e,0x08,0x0a,0x00,0x99,0x22,0x48,0x45,
-                    0x4c,0x4c,0x4f,0x22,0x00,0x17,0x08,0x14,0x00,0x89,
-                    0x20,0x31,0x30,0x00,0x00,0x00
-                ]
-            }
+        diskData: null,
+        directory: [],
+        sectorPositions: [
+            0, 21, 42, 63, 84,
+            105, 126, 147, 168, 189,
+            210, 231, 252, 273, 294,
+            315, 336, 357, 376, 395,
+            414, 433, 452, 471, 490,
+            508, 526, 544, 562, 580,
+            598, 615, 632, 649, 666
         ],
+
+        load: function(data) {
+            this.diskData = new Uint8Array(data);
+            var i, j, pos, track, sector, content, res, file;
+
+            // Ignore the BAM for now, since we can't save
+
+            // Read the directory
+            track = 18; sector = 1;
+            do {
+                res = this.readSector(track, sector, true);
+                track = res.nextTrack;
+                sector = res.nextSector;
+                content = res.content;
+
+                for (i = 0; i < 8; i++) {
+                    pos = i * 32;
+                    file = {
+                        type:        content[pos + 2] & 15,
+                        locked:      !!(content[pos + 2] & 64),
+                        closed:      !!(content[pos + 2] & 128),
+                        startTrack:  content[pos + 3],
+                        startSector: content[pos + 4],
+                        name:        new Uint8Array(16),
+                        sectorCount: content[pos + 30] + (content[pos + 31] * 256)
+                    };
+
+                    // We have to assume the size is valid, but it shouldn't
+                    // be egregiously oversized
+                    file.length = file.sectorCount * 254;
+                    if (file.sectorCount < 1024) {
+                        file.data = new Uint8Array(file.length);
+                    }
+
+                    for (j = 0; j < 16; j++) {
+                        if (content[pos + 5 + j] != 0xA0) {
+                            file.name[j] = content[pos + 5 + j];
+                        }
+                    }
+
+                    if (file.startTrack) {
+                        this.directory.push(file);
+                    }
+                }
+            } while (track);
+
+            for (i = 0; i < this.directory.length; i++) {
+                track = this.directory[i].startTrack;
+                sector = this.directory[i].startSector;
+                pos = 0;
+                do {
+                    res = this.readSector(track, sector);
+                    track = res.nextTrack;
+                    sector = res.nextSector;
+
+                    for (j = 0; j < 254; j++) {
+                        this.directory[i].data[pos++] = res.content[j];
+                    }
+                } while (track);
+            }
+        },
+        readSector: function(track, sector, padTop) {
+            var pos = (this.sectorPositions[track - 1] + sector) * 256;
+            var i, len, content = [], nextTrack, nextSector;
+
+            nextTrack = this.diskData[pos++];
+            nextSector = this.diskData[pos++];
+            if (padTop) {
+                pos -= 2;
+                len = 256;
+            } else {
+                len = 254;
+            }
+            for (i = 0; i < len; i++, pos++) {
+                content[i] = this.diskData[pos];
+            }
+
+            return {
+                nextTrack: nextTrack,
+                nextSector: nextSector,
+                content: content
+            };
+        },
 
         command: function() {
             switch (this.iec.data & 0xF0) {
@@ -54,15 +138,33 @@ define(function() {
                     break;
                 case 0x60:
                     // DATA
-                    if (this.listening) {
-                        this.currCommand = 'DATA';
+                    this.currCommand = 'DATA';
+                    if (this.talking) {
+                        // Sending a file to the computer; which file?
+                        if (this.currFilename.length == 1 && this.currFilename[0] == 42) {
+                            // *: Load first file
+                            this.currFileEntry = 0;
+                        } else {
+                            this.currFileEntry = -1;
+                            for (i = 0; i < this.directory.length; i++) {
+                                for (j = 0, m = 0; j < this.currFilename.length; j++) {
+                                    if (this.currFilename[j] == this.directory[i].name[j]) {
+                                        m++;
+                                    }
+                                }
+                                if (m == this.currFilename.length) {
+                                    this.currFileEntry = i;
+                                    break;
+                                }
+                            }
+
+                            // If still -1, the file was not found
+                        }
                     }
                     break;
                 case 0xE0:
                     // CLOSE
-                    if (this.listening) {
-                        this.currCommand = 'CLOSE';
-                    }
+                    this.currCommand = 'CLOSE';
                     break;
                 case 0xF0:
                     // OPEN
@@ -76,20 +178,23 @@ define(function() {
             }
         },
         recv: function() {
-            if (this.listening) {
-                switch (this.currCommand) {
-                    case 'OPEN':
-                        this.currFilename.push(this.iec.data);
-                        break;
-                }
+            var i, j, m;
+            switch (this.currCommand) {
+                case 'OPEN':
+                    this.currFilename.push(this.iec.data);
+                    break;
             }
         },
         send: function() {
             if (this.talking) {
-                if (this.currFilePos < this.directory[0].length) {
+                // Sending file data (if the file exists)
+                if (
+                  this.currFileEntry != -1 &&
+                  this.currFilePos < this.directory[this.currFileEntry].length
+                ) {
                     this.iec.dataready = true;
-                    this.iec.data = this.directory[0].data[this.currFilePos++];
-                    this.iec.datalast = (this.currFilePos == this.directory[0].length);
+                    this.iec.data = this.directory[this.currFileEntry].data[this.currFilePos++];
+                    this.iec.datalast = (this.currFilePos == this.directory[this.currFileEntry].length);
                 } else {
                     this.iec.dataready = false;
                 }
