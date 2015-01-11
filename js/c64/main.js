@@ -68,6 +68,28 @@ define([
         }
     };
 
+    C64.loadPrg = function(prg) {
+        var promise = $.Deferred();
+
+        $.ajax({
+            url: prg,
+            dataType: 'arraybuffer',
+            beforeSend: function(xhr) {
+                xhr.overrideMimeType("text/plain; charset=x-user-defined");
+            }
+        }).done(function(data) {
+            var content = new Uint8Array(data);
+            var pc = content[0] + (content[1] * 256);
+            for (var i = 2; i < content.length; i++) {
+                this.MMU.ram[pc+i] = content[i];
+            }
+            this.CPU.reg.PC = pc;
+            promise.resolve();
+        }.bind(this));
+
+        return promise;
+    };
+
     C64.loadDisk = function(d64) {
         var promise = $.Deferred();
 

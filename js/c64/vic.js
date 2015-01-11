@@ -278,7 +278,7 @@ define(function() {
                 right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBL;
 
                 // Character-mode badline, locks the bus for 40 phi-1 cycles
-                if (y >= top_border && y < bottom_border) {
+                if (this.DISPLAY && y >= top_border && y < bottom_border) {
                     sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL;
                     cx = sx & 7;
                     cy = (y - this.YSCROLL) & 7;
@@ -339,7 +339,7 @@ define(function() {
                     case 3:
                         if (x < left_hbl || x >= right_hbl) {
                             pixel = ((y&4) ^ (x&4)) ? 15 : 12;
-                        } else if (x < left_border || x >= right_border || !this.DISPLAY) {
+                        } else if ((!this.DISPLAY) || x < left_border || x >= right_border) {
                             pixel = this.BORDER;
                         } else {
                             // Background
