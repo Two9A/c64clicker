@@ -277,3 +277,45 @@ body.quarterscreen #screen {
 body.quarterscreen .itemlists {
     height: 383px;
 }
+body.quarterscreen .disk {
+    width: 622px;
+}
+
+.disk {
+    width: 496px;
+    border: 5px solid #c8ad7f;
+    border-radius: 5px 5px 5px 5px;
+    padding: 5px;
+    line-height: 25px;
+}
+.disk.hidden {
+    display: none;
+}
+.disk .disk_drive {
+    font-weight: bold;
+    float: left;
+    padding-bottom: 4px;
+}
+.disk #disk_files {
+    margin-left: 10px;
+}
+.disk #disk_power {
+    width: 20px;
+    height: 25px;
+    background: #300;
+    float: right;
+}
+.disk #disk_power.disk_on {
+    background: #c33;
+}
+.disk .disk_bar {
+    clear: both;
+    height: 25px;
+    width: 100%;
+    border: 1px solid #c8ad7f;
+}
+.disk #disk_progress {
+    background: #c8ad7f;
+    display: block;
+    height: 25px;
+}

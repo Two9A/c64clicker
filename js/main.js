@@ -173,6 +173,12 @@ require([
             power: 20160,
             displayAt: 10485760,
             price: 50331648
+        },{
+            name: '1541 disk drive',
+            description: "Load games into the C64! With no guarantee that any of them'll work!",
+            effect_main: 'disk',
+            displayAt: 33554432,
+            price: 50331648
         }],
 
         options: [{
@@ -195,7 +201,14 @@ require([
             scrollshake: false,
             quarterscreen: false,
             sprite: false,
-            doublesprite: false
+            doublesprite: false,
+            disk: false
+        },
+        available_disks: {
+            'test'      : "The simplest BASIC program",
+            'testscreen': "Your C64 as a (blank) TV",
+            'sorex'     : "A small and simple scroller",
+            'colorsplits': "Color Splits by Wisdom/Phobia, 1993"
         },
         thread: null,
 
@@ -241,6 +254,13 @@ require([
 
             $('#click').html('Loading BASIC...');
             C64.loadGame().done(function(){
+                $('#click').html('Render <span id="pixels_per_click"></span>');
+                $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
+            }.bind(this));
+        },
+        loadDisk: function(d64) {
+            $('#click').html('Loading BASIC...');
+            C64.loadDisk(d64).done(function(){
                 $('#click').html('Render <span id="pixels_per_click"></span>');
                 $('#pixels_per_click').text(this.pluralize(this.clickPower.toString(), 'pixel'));
             }.bind(this));
@@ -346,6 +366,17 @@ require([
             $('#curperiod').text(VIC.endpointStrings[ret.mode]);
             $('.cursor_x').css('left', j + 6);
             $('.cursor_y').css('top', i + 42);
+
+            if (C64.DISK.talking) {
+                $('#disk_power').addClass('disk_on');
+                $('#disk_progress').css('width', (
+                    0|($('.disk_bar').width() * C64.DISK.getFileProgress() / 100)
+                ) + 'px');
+            } else {
+                $('#disk_power').removeClass('disk_on');
+                $('#disk_progress').css('width', 0);
+            }
+
             this.frontContext.drawImage(VIC.backCanvas, 0, 0);
         },
         showTab: function(rel) {
@@ -457,6 +488,13 @@ require([
                 } else {
                     $('body').addClass('quarterscreen');
                 }
+            },
+            disk: function(disable) {
+                if (disable) {
+                    $('.disk').addClass('hidden');
+                } else {
+                    $('.disk').removeClass('hidden');
+                }
             }
         },
         optionHandlers: {
@@ -546,6 +584,22 @@ require([
                     this.wipe();
                 }
                 return false;
+            }.bind(this));
+
+            $('select#disk_files').html('<option value="null">(Select a disk)</option>');
+            for (var i in this.available_disks) {
+                $('select#disk_files').append(
+                    '<option value="' + i + '">' +
+                    this.available_disks[i] + 
+                    '</option>'
+                );
+            }
+            $('select#disk_files').on('change', function() {
+                var disk = $('select#disk_files').val();
+                if (disk && this.available_disks[disk]) {
+                    this.loadDisk('/rom/' + disk + '.d64');
+                }
+                $('select#disk_files').val('null');
             }.bind(this));
         },
         load: function() {
