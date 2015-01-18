@@ -38,6 +38,7 @@ require([
         cps_step: null,
         step_prev: null,
         currPeriodStr: null,
+        cursorMultiplier: null,
 
         units: [{
             name: 'Water clock',
@@ -222,6 +223,7 @@ require([
             this.clickPower = BigInteger(1);
             this.cps_step = 0;
             this.cps_div = 0;
+            this.cursorMultiplier = 1;
             this.step_prev = new Date();
 
             var i;
@@ -364,8 +366,8 @@ require([
             $('#curframe').text(ret.frames - 10);
             $('#curraster').text(i);
             $('#curperiod').text(VIC.endpointStrings[ret.mode]);
-            $('.cursor_x').css('left', j + 6);
-            $('.cursor_y').css('top', i + 42);
+            $('.cursor_x').css('left', j * this.cursorMultiplier + 6);
+            $('.cursor_y').css('top', i * this.cursorMultiplier + 42);
 
             if (C64.DISK.talking) {
                 $('#disk_power').addClass('disk_on');
@@ -485,8 +487,10 @@ require([
             quarterscreen: function(disable) {
                 if (disable) {
                     $('body').removeClass('quarterscreen');
+                    this.cursorMultiplier = 1;
                 } else {
                     $('body').addClass('quarterscreen');
+                    this.cursorMultiplier = 1.25;
                 }
             },
             disk: function(disable) {

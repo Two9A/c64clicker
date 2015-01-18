@@ -236,7 +236,7 @@ define(function() {
         renderPixels: function(pixels, skipFrames) {
             var i = 0, j, k, p;
             var x = 0, y = 0, pos = 0, row = 0, loc = 0;
-            var sx, cx, cy, px, py, pixel, mode = 0,
+            var sx, sy, cx, cy, px, py, pixel, mode = 0,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
                 right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBL,
@@ -246,7 +246,6 @@ define(function() {
                 charBase = this.CHARPTR * 2048;
 
             if (skipFrames) {
-                debugger;
                 this.frames += (0|(pixels / this.sizes.FRAME_SIZE));
                 pixels %= this.sizes.FRAME_SIZE;
             }
@@ -256,18 +255,6 @@ define(function() {
             pos = this.thisFrame * 4;
             if (y >= top_border && y < bottom_border) {
                 j = this.sizes.RASTER_LENGTH * 8;
-                row = (
-                    this.thisFrame -
-                    (top_border * this.sizes.RASTER_LENGTH) -
-                    (this.sizes.HBL + this.sizes.BORDER + this.XSCROLL)
-                );
-                if (row % j) {
-                    row += j;
-                }
-                if (row >= 0) {
-                    row = 0|(row / j);
-                    loc = row * 40;
-                }
             }
 
             var imageData = this.backContext.getImageData(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
@@ -279,21 +266,26 @@ define(function() {
 
                 // Character-mode badline, locks the bus for 40 phi-1 cycles
                 if (this.DISPLAY && y >= top_border && y < bottom_border) {
-                    sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL;
+                    sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL + 8;
+                    sy = y + this.YSCROLL;
                     cx = sx & 7;
-                    cy = (y - this.YSCROLL) & 7;
+                    cy = sy & 7;
+                    sy -= top_border;
+                    j = 0|(sx / 8);
+                    row = 0|(sy / 8);
 
-                    if (sx == 0 && cy == 0) {
+                    if (cy == 0 && sx >= 0 && sx < 320 && cx == 0) {
                         if (row < 25) {
-                            this.owner.MMU.busLock += 40;
-                            for (j = 0; j < 40; j++) {
-                                this.curLineScr[j] = this.r(locBase + loc);
-                                this.curLineCol[j] = this.colorRam[loc];
-                                loc++;
-                            }
-                            row++;
+                            this.owner.MMU.busLock++;
+                            loc = row * 40 + j;
+                            this.curLineScr[j] = this.r(locBase + loc);
+                            this.curLineCol[j] = this.colorRam[loc];
                         }
                     }
+
+                    // Badline read occurs the cycle -before-
+                    // the character is drawn onscreen
+                    sx -= 8;
                 }
 
                 // Sprite data read, locks the bus for 2 phi-1's per sprite
@@ -673,8 +665,8 @@ define(function() {
         },
         sizes: {
             HBL: 50,
-            VBLT: 17,
-            VBLB: 11,
+            VBLT: 11,
+            VBLB: 17,
             BORDER: 42,
             BORDERV: 42,
             BORDERL: 42,
