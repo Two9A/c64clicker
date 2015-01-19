@@ -189,7 +189,7 @@ define(function() {
             if (this.talking) {
                 // Sending file data (if the file exists)
                 if (
-                  this.currFileEntry != -1 &&
+                  this.currFileEntry !== null && this.currFileEntry != -1 &&
                   this.currFilePos < this.directory[this.currFileEntry].length
                 ) {
                     this.iec.dataready = true;
@@ -203,7 +203,7 @@ define(function() {
         getFileProgress: function() {
             if (this.talking) {
                 if (
-                  this.currFileEntry != -1 &&
+                  this.currFileEntry !== null && this.currFileEntry != -1 &&
                   this.currFilePos < this.directory[this.currFileEntry].length
                 ) {
                     return (this.currFilePos * 100) / this.directory[this.currFileEntry].length;

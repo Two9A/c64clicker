@@ -32,11 +32,18 @@ define(function() {
         RASTER:     null,
         RASTERHIT:  null,
 
+        VC:         null,
+        VCBASE:     null,
+        RC:         null,
+        BADLINEEN:  null,
+        IDLE:       null,
+
         stateVars: [
             'SCREENPTR', 'CHARPTR', 'IRM', 'RSEL', 'CSEL',
             'DISPLAY', 'HIRES', 'EXTCOLOR', 'MULTICOLOR',
             'XSCROLL', 'YSCROLL', 'BORDER', 'BG0', 'BG1',
-            'BG2', 'BG3', 'RASTER', 'RASTERHIT'
+            'BG2', 'BG3', 'RASTER', 'RASTERHIT',
+            'VC', 'VCBASE', 'RC', 'BADLINEEN', 'IDLE'
         ],
 
         SPR:        null,
@@ -236,7 +243,7 @@ define(function() {
         renderPixels: function(pixels, skipFrames) {
             var i = 0, j, k, p;
             var x = 0, y = 0, pos = 0, row = 0, loc = 0;
-            var sx, sy, cx, cy, px, py, pixel, mode = 0,
+            var sx, sy, cx, cy, px, py, pixel, mode = 0, badline, vc, rc,
                 left_border, right_border,
                 left_hbl = this.sizes.HBL,
                 right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBL,
@@ -264,28 +271,69 @@ define(function() {
                 left_border = this.sizes.HBL + this.sizes.BORDERL;
                 right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBL;
 
-                // Character-mode badline, locks the bus for 40 phi-1 cycles
-                if (this.DISPLAY && y >= top_border && y < bottom_border) {
-                    sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL + 8;
+                // "A badline condition can only occur if the DISPLAY bit
+                // has been set for at least one cycle in line 48"
+                if (y == 48 && this.DISPLAY) {
+                    this.BADLINEEN = true;
+                }
+
+                // Badline condition
+                badline = this.BADLINE;
+                this.BADLINE = this.BADLINEEN &&
+                    (y >= 48 && y <= 247) &&
+                    ((y & 7) == this.YSCROLL);
+                if (this.BADLINE != badline) {
+                    this.IDLE = false;
+                }
+
+                if (y >= 48 && y <= 247) {
+                    switch (x) {
+                        // Cycle 14: load VC, reset RC on badlines
+                        case 112:
+                            this.VC = this.VCBASE;
+                            if (this.BADLINE) {
+                                this.RC = 0;
+                            }
+                            break;
+                        
+                        // Cycles 15-54: Load line, tick VC along
+                        case 120: case 128: case 136: case 144: case 152:
+                        case 160: case 168: case 176: case 184: case 192:
+                        case 200: case 208: case 216: case 224: case 232:
+                        case 240: case 248: case 256: case 264: case 272:
+                        case 280: case 288: case 296: case 304: case 312:
+                        case 320: case 328: case 336: case 344: case 352:
+                        case 360: case 368: case 376: case 384: case 392:
+                        case 400: case 408: case 416: case 424: case 432:
+                            if (this.BADLINE) {
+                                this.owner.MMU.busLock++;
+                                j = 0|((x - 120) / 8);
+                                this.curLineScr[j] = this.r(locBase + this.VC);
+                                this.curLineCol[j] = this.colorRam[this.VC];
+                            }
+                            this.VC = (this.VC + 1) & 1023;
+                            break;
+
+                        // Cycle 58: Tick RC, save VC if last char line
+                        case 464:
+                            if (this.RC == 7) {
+                                this.VCBASE = this.VC;
+                                if (!this.BADLINE) {
+                                    this.IDLE = true;
+                                }
+                            }
+                            if (!this.IDLE) {
+                                this.RC = (this.RC + 1) & 7;
+                            }
+                            break;
+                    }
+                }
+
+                if (y >= top_border && y < bottom_border) {
+                    sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL;
                     sy = y + this.YSCROLL;
                     cx = sx & 7;
                     cy = sy & 7;
-                    sy -= top_border;
-                    j = 0|(sx / 8);
-                    row = 0|(sy / 8);
-
-                    if (cy == 0 && sx >= 0 && sx < 320 && cx == 0) {
-                        if (row < 25) {
-                            this.owner.MMU.busLock++;
-                            loc = row * 40 + j;
-                            this.curLineScr[j] = this.r(locBase + loc);
-                            this.curLineCol[j] = this.colorRam[loc];
-                        }
-                    }
-
-                    // Badline read occurs the cycle -before-
-                    // the character is drawn onscreen
-                    sx -= 8;
                 }
 
                 // Sprite data read, locks the bus for 2 phi-1's per sprite
@@ -358,7 +406,10 @@ define(function() {
                             }
 
                             // Text
-                            j = this.r(charBase + this.curLineScr[sx >> 3] * 8 + cy);
+                            j = this.r(this.IDLE
+                                ? 0x3FFF
+                                : (charBase + this.curLineScr[sx >> 3] * 8 + cy)
+                            );
                             if (
                               (y >= top_border && y < bottom_border) &&
                               (j & this.bitPositions[cx])
@@ -407,6 +458,9 @@ define(function() {
                         this.owner.saveFrame(++this.frames, 10);
                         this.thisFrame = 0;
                         this.RASTER = 0;
+                        this.VCBASE = 0;
+                        this.BADLINEEN = false;
+                        this.RC = 0;
                         pos = 0;
                         row = 0;
                         loc = 0;
@@ -544,6 +598,11 @@ define(function() {
             this.backContext.fillRect(0, 0, this.sizes.RASTER_LENGTH, this.sizes.RASTER_COUNT);
             this.frames = 0;
             this.thisFrame = 0;
+            this.VC = 0;
+            this.RC = 0;
+            this.VCBASE = 0;
+            this.BADLINEEN = false;
+            this.IDLE = true;
         },
         init: function() {
             this.sizes.RASTER_LENGTH = this.sizes.HBL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBL;
@@ -665,8 +724,8 @@ define(function() {
         },
         sizes: {
             HBL: 50,
-            VBLT: 11,
-            VBLB: 17,
+            VBLT: 9,
+            VBLB: 19,
             BORDER: 42,
             BORDERV: 42,
             BORDERL: 42,

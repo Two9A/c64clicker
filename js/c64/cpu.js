@@ -1041,19 +1041,23 @@ define(function() {
             'NMI': 258
         },
         step: function() {
+            this.clock++;
+
             var op; // [opcode, addr, size, time]
             if (this.halted) {
                 return;
             }
             if (this.owner.MMU.busLock) {
+                if (this.owner.game.debug) {
+                    console.log('BUS LOCK: ' + this.owner.MMU.busLock);
+                }
                 this.owner.MMU.busLock--;
                 return;
             }
-            if (!this.clock) {
+            if (this.clock == 1) {
                 this.signal('RST');
             }
 
-            this.clock++;
             this.curCycle++;
             if (this.curOp.length == 0) {
                 this.reg.origPC = this.reg.PC;
