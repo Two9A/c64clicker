@@ -99,9 +99,9 @@ define(function() {
                 case 14: // SPRX7
                     // X-coords are "real", as opposed to the register mapped
                     // coordinate system, which is 68 pixels indented
-                    x = this.SPR[addr >> 1].x - this.sizes.HBL - this.sizes.BORDER + 24;
+                    x = this.SPR[addr >> 1].x - this.sizes.HBLL - this.sizes.BORDER + 24;
                     x = (x & 256) + val;
-                    this.SPR[addr >> 1].x = x + this.sizes.HBL + this.sizes.BORDER - 24;
+                    this.SPR[addr >> 1].x = x + this.sizes.HBLL + this.sizes.BORDER - 24;
                     break;
                 case 1: // SPRY0
                 case 3: // SPRY1
@@ -118,9 +118,9 @@ define(function() {
                     break;
                 case 16: // SPRXHI
                     for (i = 0; i < 8; i++) {
-                        x = this.SPR[i].x - this.sizes.HBL - this.sizes.BORDER + 24;
+                        x = this.SPR[i].x - this.sizes.HBLL - this.sizes.BORDER + 24;
                         x = (x & 255) + ((val & (1 << i)) ? 256 : 0);
-                        this.SPR[i].x = x + this.sizes.HBL + this.sizes.BORDER - 24;
+                        this.SPR[i].x = x + this.sizes.HBLL + this.sizes.BORDER - 24;
                     }
                     break;
                 case 17: // FLAGS1
@@ -243,10 +243,10 @@ define(function() {
         renderPixels: function(pixels, skipFrames) {
             var i = 0, j, k, p;
             var x = 0, y = 0, pos = 0, row = 0, loc = 0;
-            var sx, sy, cx, cy, px, py, pixel, mode = 0, badline, vc, rc,
+            var sx, cx, px, py, pixel, mode = 0, badline,
                 left_border, right_border,
-                left_hbl = this.sizes.HBL,
-                right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBL,
+                left_hbl = this.sizes.HBLL,
+                right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBLR,
                 top_border = this.sizes.VBLT + this.sizes.BORDER,
                 bottom_border = this.sizes.VBLT + this.sizes.BORDER + this.sizes.HEIGHT_ORIG,
                 locBase = this.SCREENPTR * 1024,
@@ -268,8 +268,8 @@ define(function() {
             this.RASTER = y;
 
             if (pixels) do {
-                left_border = this.sizes.HBL + this.sizes.BORDERL;
-                right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBL;
+                left_border = this.sizes.HBLL + this.sizes.BORDERL;
+                right_border = this.sizes.RASTER_LENGTH - this.sizes.BORDERR - this.sizes.HBLR;
 
                 // "A badline condition can only occur if the DISPLAY bit
                 // has been set for at least one cycle in line 48"
@@ -330,10 +330,8 @@ define(function() {
                 }
 
                 if (y >= top_border && y < bottom_border) {
-                    sx = x - this.sizes.HBL - this.sizes.BORDER - this.XSCROLL;
-                    sy = y + this.YSCROLL;
+                    sx = x - this.sizes.HBLL - this.sizes.BORDER - this.XSCROLL;
                     cx = sx & 7;
-                    cy = sy & 7;
                 }
 
                 // Sprite data read, locks the bus for 2 phi-1's per sprite
@@ -368,7 +366,7 @@ define(function() {
 
                     // HBlank/border
                     case 2:
-                        if (x < 50 || x >= right_hbl) {
+                        if (x < left_hbl || x >= right_hbl) {
                             pixel = ((y&4) ^ (x&4)) ? 15 : 12;
                         } else {
                             pixel = this.BORDER;
@@ -408,7 +406,7 @@ define(function() {
                             // Text
                             j = this.r(this.IDLE
                                 ? 0x3FFF
-                                : (charBase + this.curLineScr[sx >> 3] * 8 + cy)
+                                : (charBase + this.curLineScr[sx >> 3] * 8 + this.RC)
                             );
                             if (
                               (y >= top_border && y < bottom_border) &&
@@ -576,7 +574,7 @@ define(function() {
             var i, j;
             for (i = 0; i < 8; i++) {
                 this.SPR[i] = {
-                    x: this.sizes.HBL + this.sizes.BORDER - 24,
+                    x: this.sizes.HBLL + this.sizes.BORDER - 24,
                     y: 0,
                     col: 0,
                     on: false,
@@ -605,7 +603,7 @@ define(function() {
             this.IDLE = true;
         },
         init: function() {
-            this.sizes.RASTER_LENGTH = this.sizes.HBL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBL;
+            this.sizes.RASTER_LENGTH = this.sizes.HBLL + this.sizes.BORDERL + this.sizes.WIDTH + this.sizes.BORDERR + this.sizes.HBLR;
             this.sizes.RASTER_COUNT = this.sizes.VBLT + this.sizes.BORDERV + this.sizes.HEIGHT + this.sizes.BORDERV + this.sizes.VBLB;
             this.sizes.FRAME_SIZE = this.sizes.RASTER_LENGTH * this.sizes.RASTER_COUNT;
 
@@ -723,7 +721,8 @@ define(function() {
             SPRC7:    46
         },
         sizes: {
-            HBL: 50,
+            HBLL: 78,
+            HBLR: 22,
             VBLT: 9,
             VBLB: 19,
             BORDER: 42,
@@ -738,20 +737,20 @@ define(function() {
         colors: [
             [0x00, 0x00, 0x00], // black
             [0xFF, 0xFF, 0xFF], // white
-            [0x88, 0x00, 0x00], // red
-            [0xAA, 0xFF, 0xEE], // cyan
-            [0xCC, 0x44, 0xCC], // magenta
-            [0x00, 0xCC, 0x55], // green
-            [0x00, 0x00, 0xAA], // blue
-            [0xEE, 0xEE, 0x77], // yellow
-            [0xDD, 0x88, 0x55], // orange
-            [0x66, 0x44, 0x00], // brown
-            [0xFF, 0x77, 0x77], // light red
-            [0x33, 0x33, 0x33], // grey 1
-            [0x77, 0x77, 0x77], // grey 2
-            [0xAA, 0xFF, 0x66], // light green
-            [0x00, 0x88, 0xFF], // light blue
-            [0xBB, 0xBB, 0xBB]  // grey 3
+            [0x68, 0x37, 0x2B], // red
+            [0x70, 0xA4, 0xB2], // cyan
+            [0x6F, 0x3D, 0x86], // magenta
+            [0x58, 0x8D, 0x43], // green
+            [0x35, 0x28, 0x79], // blue
+            [0xB8, 0xC7, 0x6F], // yellow
+            [0x6F, 0x4F, 0x25], // orange
+            [0x43, 0x39, 0x00], // brown
+            [0x9A, 0x67, 0x59], // light red
+            [0x44, 0x44, 0x44], // grey 1
+            [0x6C, 0x6C, 0x6C], // grey 2
+            [0x9A, 0xD2, 0x84], // light green
+            [0x6C, 0x5E, 0xB5], // light blue
+            [0x95, 0x95, 0x95]  // grey 3
         ],
         bitPositions: [128, 64, 32, 16, 8, 4, 2, 1],
         endpointStrings: [
