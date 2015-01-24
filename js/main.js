@@ -207,8 +207,10 @@ require([
         },
         available_disks: {
             'test'      : "The simplest BASIC program",
-            'testscreen': "Your C64 as a (blank) TV",
-            'sorex'     : "A small and simple scroller",
+            'sorex'     : "359-Char Scroller by Sorex/WotW, 2010",
+            'testscreen': "Test Screen by Dariusz/Alpha Flight, 2007",
+            'raster2'   : "A basic BASIC ISR by Zirias, 2014",
+            '69uasr'    : "Stable Raster by Hokuto Force, 2012",
             'colorsplits': "Color Splits by Wisdom/Phobia, 1993"
         },
         thread: null,

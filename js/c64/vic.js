@@ -377,7 +377,7 @@ define(function() {
                     case 3:
                         if (x < left_hbl || x >= right_hbl) {
                             pixel = ((y&4) ^ (x&4)) ? 15 : 12;
-                        } else if ((!this.DISPLAY) || x < left_border || x >= right_border) {
+                        } else if ((!this.BADLINEEN) || x < left_border || x >= right_border) {
                             pixel = this.BORDER;
                         } else {
                             // Background
