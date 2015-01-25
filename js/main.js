@@ -206,12 +206,21 @@ require([
             disk: false
         },
         available_disks: {
-            'test'      : "The simplest BASIC program",
-            'sorex'     : "359-Char Scroller by Sorex/WotW, 2010",
-            'testscreen': "Test Screen by Dariusz/Alpha Flight, 2007",
-            'raster2'   : "A basic BASIC ISR by Zirias, 2014",
-            '69uasr'    : "Stable Raster by Hokuto Force, 2012",
-            'colorsplits': "Color Splits by Wisdom/Phobia, 1993"
+            "Effects": {
+                'test'      : "The simplest BASIC program",
+                'sorex'     : "359-Char Scroller by Sorex/WotW, 2010",
+                'testscreen': "Test Screen by Dariusz/Alpha Flight, 2007",
+                'raster2'   : "A basic BASIC ISR by Zirias, 2014",
+                '69uasr'    : "Stable Raster by Hokuto Force, 2012",
+                'truth'     : "The Truth by The Dreams, 2003",
+                'microture' : "Microture by cult and Padua, 2009",
+                '1dnoise'   : "1D Noise by Cruzer/CML Sports, 2010",
+                '32bfuzzy'  : "32 Bytes Fuzzy Logic by RasterDream, 2012",
+                'flag'      : "Norwegian Flag by TWW/Creators, 2014"
+            },
+            "Demos": {
+                'colorsplits': "Color Splits by Wisdom/Phobia, 1993"
+            }
         },
         thread: null,
 
@@ -594,15 +603,17 @@ require([
 
             $('select#disk_files').html('<option value="null">(Select a disk)</option>');
             for (var i in this.available_disks) {
+                var options = '';
+                for (var j in this.available_disks[i]) {
+                    options += ('<option value="' + j + '">' + this.available_disks[i][j] + '</option>');
+                }
                 $('select#disk_files').append(
-                    '<option value="' + i + '">' +
-                    this.available_disks[i] + 
-                    '</option>'
+                    '<optgroup label="' + i + '">' + options + '</optgroup>'
                 );
             }
             $('select#disk_files').on('change', function() {
                 var disk = $('select#disk_files').val();
-                if (disk && this.available_disks[disk]) {
+                if (disk) {
                     this.loadDisk('/rom/' + disk + '.d64');
                 }
                 $('select#disk_files').val('null');
