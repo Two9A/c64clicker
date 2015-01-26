@@ -243,7 +243,7 @@ define(function() {
         renderPixels: function(pixels, skipFrames) {
             var i = 0, j, k, p;
             var x = 0, y = 0, pos = 0, row = 0, loc = 0;
-            var sx, cx, px, py, pixel, mode = 0, badline,
+            var sx, cx, px, py, pixel, pixmode, mode = 0, badline,
                 left_border, right_border,
                 left_hbl = this.sizes.HBLL,
                 right_hbl = this.sizes.RASTER_LENGTH - this.sizes.HBLR,
@@ -381,7 +381,7 @@ define(function() {
                             pixel = this.BORDER;
                         } else {
                             // Background
-                            pixel = this.BG0;
+                            pixel = -1;
 
                             // Sprites wot live below the text
                             for (j = 7; j >= 0; j--) {
@@ -404,15 +404,132 @@ define(function() {
                             }
 
                             // Text
-                            j = this.r(this.IDLE
-                                ? 0x3FFF
-                                : (charBase + this.curLineScr[sx >> 3] * 8 + this.RC)
-                            );
-                            if (
-                              (y >= top_border && y < bottom_border) &&
-                              (j & this.bitPositions[cx])
-                            ) {
-                                pixel = this.curLineCol[sx >> 3];
+                            if (y >= top_border && y < bottom_border) {
+                                pixmode =
+                                    (this.EXTCOLOR ? 4 : 0) |
+                                    (this.HIRES ? 2 : 0) |
+                                    (this.MULTICOLOR ? 1 : 0);
+                                switch (pixmode) {
+                                    case 0:
+                                        // Standard text mode
+                                        j = this.r(this.IDLE
+                                            ? 0x3FFF
+                                            : (charBase + this.curLineScr[sx >> 3] * 8 + this.RC)
+                                        );
+                                        if (j & this.bitPositions[cx]) {
+                                            pixel = this.curLineCol[sx >> 3];
+                                        } else if (pixel == -1) {
+                                            pixel = this.BG0;
+                                        }
+                                        break;
+
+                                    case 1:
+                                        // Multicolor text mode
+                                        j = this.r(this.IDLE
+                                            ? 0x3FFF
+                                            : (charBase + this.curLineScr[sx >> 3] * 8 + this.RC)
+                                        );
+                                        if (this.curLineCol[sx >> 3] & 8) {
+                                            cx &= 6;
+                                            k = ((j & this.bitPositions[cx]) ? 2 : 0) |
+                                                ((j & this.bitPositions[cx+1]) ? 1 : 0);
+                                            if (k == 3) {
+                                                pixel = this.curLineCol[sx >> 3] & 7;
+                                            } else if (pixel == -1) {
+                                                switch (k) {
+                                                    case 0:
+                                                        pixel = this.BG0;
+                                                        break;
+                                                    case 1:
+                                                        pixel = this.BG1;
+                                                        break;
+                                                    case 2:
+                                                        pixel = this.BG2;
+                                                        break;
+                                                }
+                                            }
+                                        } else {
+                                            if (j & this.bitPositions[cx]) {
+                                                pixel = this.curLineCol[sx >> 3] & 7;
+                                            } else if (pixel == -1) {
+                                                pixel = this.BG0;
+                                            }
+                                        }
+                                        break;
+
+                                    case 2:
+                                        // Bitmap mode
+                                        j = this.r(this.IDLE
+                                            ? 0x3FFF
+                                            : ((charBase & 8192) + (this.VC * 8) + this.RC)
+                                        );
+                                        pixel = this.curLineScr[sx >> 3];
+                                        if (j & this.bitPositions[cx]) {
+                                            pixel >>= 4;
+                                        }
+                                        pixel &= 15;
+                                        break;
+
+                                    case 3:
+                                        // Multicolor bitmap mode
+                                        j = this.r(this.IDLE
+                                            ? 0x3FFF
+                                            : ((charBase & 8192) + (this.VC * 8) + this.RC)
+                                        );
+                                        cx &= 6;
+                                        k = ((j & this.bitPositions[cx]) ? 2 : 0) |
+                                            ((j & this.bitPositions[cx+1]) ? 1 : 0);
+                                        switch (k) {
+                                            case 0:
+                                                if (pixel == -1) {
+                                                    pixel = this.BG0;
+                                                }
+                                                break;
+                                            case 1:
+                                                pixel = this.curLineScr[sx >> 3] >> 4;
+                                                break;
+                                            case 2:
+                                                pixel = this.curLineScr[sx >> 3];
+                                                break;
+                                            case 3:
+                                                pixel = this.curLineCol[sx >> 3];
+                                                break;
+                                        }
+                                        pixel &= 15;
+                                        break;
+
+                                    case 4:
+                                        // Extended-color text mode
+                                        j = this.r(this.IDLE
+                                            ? 0x3FFF
+                                            : (charBase + (this.curLineScr[sx >> 3] & 63) * 8 + this.RC)
+                                        );
+                                        if (j & this.bitPositions[cx]) {
+                                            pixel = this.curLineCol[sx >> 3];
+                                        } else if (pixel == -1) {
+                                            switch (this.curLineScr[sx >> 3] & 192) {
+                                                case 0:
+                                                    pixel = this.BG0;
+                                                    break;
+                                                case 64:
+                                                    pixel = this.BG1;
+                                                    break;
+                                                case 128:
+                                                    pixel = this.BG2;
+                                                    break;
+                                                case 192:
+                                                    pixel = this.BG3;
+                                                    break;
+                                            }
+                                        }
+                                        break;
+
+                                    // Cases 5, 6, 7 are invalid modes
+                                    case 5:
+                                    case 6:
+                                    case 7:
+                                        break;
+                                }
                             }
 
                             // Sprites above the text
@@ -438,6 +555,11 @@ define(function() {
                         break;
                 }
                 
+                if (pixel == -1) {
+                    // Rendering failed, probably an invalid mode
+                    pixel = 0;
+                }
+
                 pixel = this.colors[0 | pixel];
                 imageData.data[pos++] = pixel[0];
                 imageData.data[pos++] = pixel[1];
