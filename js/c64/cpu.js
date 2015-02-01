@@ -732,7 +732,7 @@ define(function() {
                         return false;
                     case 3:
                         if (this.reg.addr === null) {
-                            this.reg.addr = this.reg.tmp2 + this.reg.X;
+                            this.reg.addr = (this.reg.tmp2 + this.reg.X) & 0xFFFF;
                             if ((this.reg.tmp2 & 0xFF00) != (this.reg.addr & 0xFF00)) {
                                 // Page boundary, add a cycle
                                 return false;
@@ -765,7 +765,7 @@ define(function() {
                         return false;
                     case 3:
                         if (this.reg.addr === null) {
-                            this.reg.addr = this.reg.tmp2 + this.reg.Y;
+                            this.reg.addr = (this.reg.tmp2 + this.reg.Y) & 0xFFFF;
                             if ((this.reg.tmp2 & 0xFF00) != (this.reg.addr & 0xFF00)) {
                                 // Page boundary, add a cycle
                                 return false;
@@ -882,7 +882,7 @@ define(function() {
                             return false;
                         }
                         if (this.reg.addr === null) {
-                            this.reg.addr = this.reg.tmp3 + this.reg.Y;
+                            this.reg.addr = (this.reg.tmp3 + this.reg.Y) & 0xFFFF;
                             if ((this.reg.tmp3 & 0xFF00) != (this.reg.addr & 0xFF00)) {
                                 // Page boundary crossed
                                 return false;
@@ -902,45 +902,53 @@ define(function() {
                 return true;
             }
         },
-        disasm: {
-            imp: function() {
+        disasmHandlers: {
+            imp: function(op) {
                 return '';
             },
-            acc: function() {
+            acc: function(op) {
                 return 'a';
             },
-            imm: function() {
-                return '#$' + this.pad(this.curOp[1], '0', 2);
+            imm: function(op) {
+                return '#$' + this.pad(op[1], '0', 2);
             },
-            z: function() {
-                return '$' + this.pad(this.curOp[1], '0', 2);
+            z: function(op) {
+                return '$' + this.pad(op[1], '0', 2);
             },
-            zx: function() {
-                return '$' + this.pad(this.curOp[1], '0', 2) + ',x';
+            zx: function(op) {
+                return '$' + this.pad(op[1], '0', 2) + ',x';
             },
-            zy: function() {
-                return '$' + this.pad(this.curOp[1], '0', 2) + ',y';
+            zy: function(op) {
+                return '$' + this.pad(op[1], '0', 2) + ',y';
             },
-            abs: function() {
-                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4);
+            abs: function(op) {
+                return '$' + this.pad(op[1] + (op[2] << 8), '000', 4);
             },
-            abx: function() {
-                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ',x';
+            abx: function(op) {
+                return '$' + this.pad(op[1] + (op[2] << 8), '000', 4) + ',x';
             },
-            aby: function() {
-                return '$' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ',y';
+            aby: function(op) {
+                return '$' + this.pad(op[1] + (op[2] << 8), '000', 4) + ',y';
             },
-            ind: function() {
-                return '($' + this.pad(this.curOp[1] + (this.curOp[2] << 8), '000', 4) + ')';
+            ind: function(op) {
+                return '($' + this.pad(op[1] + (op[2] << 8), '000', 4) + ')';
             },
-            rel: function() {
-                return '$' + this.pad(this.reg.addr, '000', 4);
+            rel: function(op) {
+                if (this.reg.addr) {
+                    return '$' + this.pad(this.reg.addr, '000', 4);
+                } else {
+                    if (op[1] & 128) {
+                        return '-' + (((~op[1]) + 1) & 127);
+                    } else {
+                        return '+' + op[1];
+                    }
+                }
             },
-            izx: function() {
-                return '($' + this.pad(this.curOp[1], '0', 2) + '),Y';
+            izy: function(op) {
+                return '($' + this.pad(op[1], '0', 2) + '),Y';
             },
-            izy: function() {
-                return '($' + this.pad(this.curOp[1], '0', 2) + ',X)';
+            izx: function(op) {
+                return '($' + this.pad(op[1], '0', 2) + ',X)';
             }
         },
         map: [
@@ -1094,9 +1102,30 @@ define(function() {
                 }
             }
         },
+        disasm: function(pc, len) {
+            len = len || 64;
+            var i = 0, j, op = [], prevPC;
+
+            do {
+                prevPC = pc;
+                op.length = 0;
+                op.push(this.owner.MMU.r(pc++));
+
+                for (j = 1; j < this.map[op[0]][2]; j++) {
+                    op.push(this.owner.MMU.r(pc++));
+                }
+
+                i += op.length;
+                console.warn([
+                    this.pad(prevPC, '000', 4),
+                    this.map[op[0]][0],
+                    this.disasmHandlers[this.map[op[0]][1]].call(this, op).toUpperCase()
+                ].join(' '));
+            } while (i < len);
+        },
         debugString: function() {
             var i, opcodes = '',
-                operand = this.disasm[this.map[this.curOp[0]][1]].call(this).toUpperCase();
+                operand = this.disasmHandlers[this.map[this.curOp[0]][1]].call(this, this.curOp).toUpperCase();
 
             for (i = 0; i < this.curOp.length; i++) {
                 opcodes += this.pad(this.curOp[i], '0', 2, true);
