@@ -2,6 +2,7 @@ Commodore Clicker
 =================
 
 A JavaScript incremental game which drives the clock of a Commodore 64 emulation. Or at least, that's the eventual goal.
+[Play the game here.](http://c64clicker.com/)
 
 Usage
 -----
