@@ -94,6 +94,13 @@ require([
             cps: 157248,
             displayAt: 67108864,
             basePrice: 134217728
+        },{
+            name: 'Diamond Crystal',
+            description: "So shiny! :D (+10 frames/s)",
+            cps: 39312,
+            displayAt: 420,
+            basePrice: 1342177280
+        },{
         }],
 
         upgrades: [{
